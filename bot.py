@@ -247,7 +247,7 @@ async def start_command(client, message: Message):
         await message.reply_text(welcome_text)
 
 # Handle text messages (anime search) - FIXED LINE
-@app.on_message(filters.text & filters.private & ~filters.command())
+@app.on_message(filters.text & filters.private)
 async def handle_message(client, message: Message):
     user_id = message.from_user.id
     user_input = message.text
