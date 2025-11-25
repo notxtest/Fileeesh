@@ -22,7 +22,7 @@ async def is_admin(user_id: int) -> bool:
 # 👥 ADMIN MANAGEMENT SYSTEM
 # ==========================================================
 
-async def register_users_commands(app: Client):
+def register_users_commands(app: Client):
 
     # ==========================================================
     # 🤖 ADMIN_LIST COMMAND
