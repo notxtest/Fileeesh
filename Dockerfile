@@ -1,18 +1,15 @@
-FROM python:3.9-slim
-
+########################################
+# Start from a lightweight Python image
+FROM python:3.10-slim
 WORKDIR /app
+COPY . /app
 
-# Install system dependencies including build tools
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Install dependencies
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+    
+# Environment variable to force unbuffered output (helps in logging)
+ENV PYTHONUNBUFFERED=1
 
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY bot.py .
-
-CMD ["python", "bot.py"]
+# Run the bot..
+CMD ["python", "main.py"]
