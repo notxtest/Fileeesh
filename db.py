@@ -8,6 +8,7 @@ logging.basicConfig(
     format='[%(levelname)s] %(asctime)s - %(message)s'
 )
 
+db = None
 try:
     client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
     db = client[DB_NAME]
