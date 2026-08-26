@@ -19,7 +19,7 @@ SHORT_TUT = "https://t.me/How_to_Download_7x/26"
 
 # Bot Configuration
 SESSION = "yato"
-TOKEN = os.getenv("BOT_TOKEN", "")
+TOKEN = os.getenv("BOT_TOKEN", "8966687209:AAEKwbScmqL57ZNU4zzxFPSSGVXAUczcJ6E")
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 WORKERS = 5
