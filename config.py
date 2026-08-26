@@ -28,7 +28,7 @@ DB_URI = os.getenv("DB_URI", "mongodb")
 DB_NAME = os.getenv("DB_NAME", "yato")
 
 # Force Subscription Channels
-FSUB_CHANNEL_ID = int(os.getenv("FSUB_CHANNEL_ID", ""))
+FSUB_CHANNEL_ID = int(os.getenv("FSUB_CHANNEL_ID", "-1004451251761"))
 FSUB_REQUEST_ENABLED = os.getenv("FSUB_REQUEST_ENABLED", "True").lower() == "true"
 FSUB_TIMER_MINUTES = int(os.getenv("FSUB_TIMER_MINUTES", "10"))
 FSUBS = [[FSUB_CHANNEL_ID, FSUB_REQUEST_ENABLED, FSUB_TIMER_MINUTES]]
