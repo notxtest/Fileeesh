@@ -1,20 +1,39 @@
-from pyrogram import Client
-from config import API_ID, API_HASH, BOT_TOKEN
-import logging
-from handlers import register_all_handlers
-from db import db
 
-logging.basicConfig(level=logging.INFO)
+import asyncio
+from bot import Bot, web_app
+from pyrogram import compose
+from config import *
 
-app = Client(
-    "group_manger_bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
-)
+async def main():
+    app = []
 
-register_all_handlers(app)
+    # Create bot instance using config.py values
+    app.append(
+        Bot(
+            SESSION,
+            WORKERS,
+            DB_CHANNEL,
+            FSUBS,
+            TOKEN,
+            ADMINS,
+            MESSAGES,
+            AUTO_DEL,
+            DB_URI,
+            DB_NAME,
+            API_ID,
+            API_HASH,
+            PROTECT,
+            DISABLE_BTN
+        )
+    )
 
-print("Bot is starting... ")
+    await compose(app)
 
-app.run()
+
+async def runner():
+    await asyncio.gather(
+        main(),
+        web_app()
+    )
+
+asyncio.run(runner())
