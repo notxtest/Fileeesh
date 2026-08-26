@@ -11,7 +11,7 @@ LOG_FILE_NAME = "bot.log"
 PORT = os.getenv("PORT", "5010")
 OWNER_ID = int(os.getenv("OWNER_ID", "0123456789"))
 
-MSG_EFFECT = 5046509860389126442
+MSG_EFFECT = 5104841245755180586
 
 SHORT_URL = os.getenv("SHORT_URL", "linkshortify.com")
 SHORT_API = os.getenv("SHORT_API", "")
