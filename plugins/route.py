@@ -20,7 +20,7 @@ async def root_route_handler(request):
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Yugen FileStore - README</title>
+        <title>CinevVines FileStore - README</title>
         <style>
             body {{
                 font-family: sans-serif;
