@@ -1,5 +1,7 @@
 import os
 import logging
+import secrets
+import time
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 
@@ -34,6 +36,49 @@ ADMINS = [7171541681, 7171541681]
 
 DISABLE_BTN = True
 PROTECT = True
+
+# Short Link Token Storage
+short_link_tokens = {}
+
+def generate_short_token(user_id, base64_string):
+    """Generate unique token for short link"""
+    timestamp = int(time.time())
+    token = secrets.token_hex(8)
+    short_link_tokens[token] = {
+        'user_id': user_id,
+        'base64_string': base64_string,
+        'timestamp': timestamp
+    }
+    return f"yu3elk_{base64_string}_{token}_7"
+
+def verify_short_token(user_id, payload):
+    """Verify token and check time"""
+    try:
+        parts = payload.split('_')
+        if len(parts) != 3:
+            return None, None, 0
+        
+        base64_string = parts[0]
+        token = parts[1]
+        
+        if token not in short_link_tokens:
+            return None, base64_string, 0
+        
+        token_data = short_link_tokens[token]
+        
+        if token_data['user_id'] != user_id:
+            return None, base64_string, 0
+        
+        time_diff = time.time() - token_data['timestamp']
+        del short_link_tokens[token]
+        
+        if time_diff < 60:
+            return "bypass", base64_string, time_diff
+        
+        return "valid", base64_string, time_diff
+        
+    except:
+        return None, None, 0
 
 # Messages Configuration
 MESSAGES = {
