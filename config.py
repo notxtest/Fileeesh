@@ -42,14 +42,18 @@ short_link_tokens = {}
 
 def generate_short_token(user_id, base64_string):
     """Generate unique token for short link"""
-    timestamp = int(time.time())
-    token = secrets.token_hex(8)
-    short_link_tokens[token] = {
-        'user_id': user_id,
-        'base64_string': base64_string,
-        'timestamp': timestamp
-    }
-    return f"yu3elk_{base64_string}_{token}_7"
+    try:
+        timestamp = int(time.time())
+        token = secrets.token_hex(8)
+        short_link_tokens[token] = {
+            'user_id': user_id,
+            'base64_string': base64_string,
+            'timestamp': timestamp
+        }
+        return f"yu3elk_{base64_string}_{token}_7"
+    except Exception as e:
+        print(f"[Token Generation Error] {e}")
+        return None
 
 def verify_short_token(user_id, payload):
     """Verify token and check time"""
@@ -57,27 +61,28 @@ def verify_short_token(user_id, payload):
         parts = payload.split('_')
         if len(parts) != 3:
             return None, None, 0
-        
+
         base64_string = parts[0]
         token = parts[1]
-        
+
         if token not in short_link_tokens:
             return None, base64_string, 0
-        
+
         token_data = short_link_tokens[token]
-        
+
         if token_data['user_id'] != user_id:
             return None, base64_string, 0
-        
+
         time_diff = time.time() - token_data['timestamp']
         del short_link_tokens[token]
-        
+
         if time_diff < 60:
             return "bypass", base64_string, time_diff
-        
+
         return "valid", base64_string, time_diff
-        
-    except:
+
+    except Exception as e:
+        print(f"[Token Verification Error] {e}")
         return None, None, 0
 
 # Messages Configuration
