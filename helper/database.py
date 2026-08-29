@@ -94,7 +94,7 @@ class MongoDB:
             ]
         })
         return [doc['_id'] async for doc in cursor]
-        
+
     async def get_expiry_date(self, user_id: int) -> datetime:
         doc = await self.premium_users.find_one({'_id': user_id})
         return doc.get('expiry_date') if doc else None
@@ -274,10 +274,10 @@ class MongoDB:
             await self.clear_expired_fsub_statuses(7)
             # Clean old join request records (older than 30 days)
             await self.clear_old_join_requests(30)
-            
+
             # Additional cleanup for orphaned records
             await self.cleanup_orphaned_records()
-            
+
             return True
         except Exception as e:
             print(f"Database cleanup error: {e}")
@@ -289,15 +289,15 @@ class MongoDB:
             # Remove fsub status records for users who no longer exist
             users = await self.full_userbase()
             user_ids_set = set(users)
-            
+
             # Clean fsub_status collection
             async for doc in self.fsub_status.find({"user_id": {"$nin": users}}):
                 await self.fsub_status.delete_one({"_id": doc["_id"]})
-            
+
             # Clean request_sub collection
             async for doc in self.request_sub.find({"user_id": {"$nin": users}}):
                 await self.request_sub.delete_one({"_id": doc["_id"]})
-                
+
             return True
         except Exception as e:
             print(f"Error cleaning orphaned records: {e}")
@@ -312,21 +312,21 @@ class MongoDB:
             pending_requests = await self.request_sub.count_documents({"status": "pending"})
             approved_requests = await self.request_sub.count_documents({"status": "approved"})
             rejected_requests = await self.request_sub.count_documents({"status": "rejected"})
-            
+
             # Status breakdown
             status_breakdown = {}
             async for doc in self.fsub_status.aggregate([
                 {"$group": {"_id": "$status", "count": {"$sum": 1}}}
             ]):
                 status_breakdown[doc["_id"]] = doc["count"]
-            
+
             # Channel-wise statistics
             channel_stats = {}
             async for doc in self.fsub_status.aggregate([
                 {"$group": {"_id": "$channel_id", "count": {"$sum": 1}}}
             ]):
                 channel_stats[doc["_id"]] = doc["count"]
-            
+
             # Recent activity (last 24 hours)
             from datetime import datetime, timedelta
             yesterday = datetime.now() - timedelta(days=1)
@@ -336,7 +336,7 @@ class MongoDB:
             recent_requests = await self.request_sub.count_documents(
                 {"submitted_at": {"$gte": yesterday}}
             )
-            
+
             return {
                 "total_fsub_records": fsub_count,
                 "total_join_requests": request_count,
@@ -359,7 +359,7 @@ class MongoDB:
         try:
             # Get all fsub statuses
             fsub_statuses = await self.get_user_fsub_statuses(user_id)
-            
+
             # Get join request history
             join_requests = []
             async for doc in self.request_sub.find({"user_id": user_id}):
@@ -369,13 +369,13 @@ class MongoDB:
                     "submitted_at": doc["submitted_at"],
                     "last_updated": doc["last_updated"]
                 })
-            
+
             # Check if user is banned
             is_banned = await self.is_banned(user_id)
-            
+
             # Check if user is premium
             is_premium = await self.is_pro(user_id)
-            
+
             return {
                 "user_id": user_id,
                 "is_banned": is_banned,
@@ -394,7 +394,7 @@ class MongoDB:
         try:
             # Get all users in channel
             channel_users = await self.get_channel_users(channel_id)
-            
+
             # Get fsub status breakdown for this channel
             status_counts = {}
             async for doc in self.fsub_status.aggregate([
@@ -402,7 +402,7 @@ class MongoDB:
                 {"$group": {"_id": "$status", "count": {"$sum": 1}}}
             ]):
                 status_counts[doc["_id"]] = doc["count"]
-            
+
             # Get join request stats for this channel
             request_stats = {}
             async for doc in self.request_sub.aggregate([
@@ -410,7 +410,7 @@ class MongoDB:
                 {"$group": {"_id": "$status", "count": {"$sum": 1}}}
             ]):
                 request_stats[doc["_id"]] = doc["count"]
-            
+
             # Get recent activity (last 7 days)
             from datetime import datetime, timedelta
             week_ago = datetime.now() - timedelta(days=7)
@@ -419,12 +419,12 @@ class MongoDB:
                 "status": "joined",
                 "last_updated": {"$gte": week_ago}
             })
-            
+
             recent_requests = await self.request_sub.count_documents({
                 "channel_id": channel_id,
                 "submitted_at": {"$gte": week_ago}
             })
-            
+
             return {
                 "channel_id": channel_id,
                 "total_users": len(channel_users),
@@ -447,7 +447,7 @@ class MongoDB:
                 user_id = update["user_id"]
                 channel_id = update["channel_id"]
                 status = update["status"]
-                
+
                 operations.append({
                     "updateOne": {
                         "filter": {"user_id": user_id, "channel_id": channel_id},
@@ -460,7 +460,7 @@ class MongoDB:
                         "upsert": True
                     }
                 })
-            
+
             if operations:
                 result = await self.fsub_status.bulk_write(operations)
                 return result
@@ -474,23 +474,23 @@ class MongoDB:
         try:
             # Get stored users for this channel
             stored_users = await self.get_channel_users(channel_id)
-            
+
             # Find users to add (in channel but not in database)
             users_to_add = set(current_members) - set(stored_users)
-            
+
             # Find users to remove (in database but not in channel)
             users_to_remove = set(stored_users) - set(current_members)
-            
+
             # Add new users
             for user_id in users_to_add:
                 await self.add_channel_user(channel_id, user_id)
                 await self.update_fsub_status(user_id, channel_id, "joined")
-            
+
             # Remove old users
             for user_id in users_to_remove:
                 await self.remove_channel_user(channel_id, user_id)
                 await self.update_fsub_status(user_id, channel_id, "left")
-            
+
             return {
                 "added": len(users_to_add),
                 "removed": len(users_to_remove),
@@ -508,17 +508,17 @@ class MongoDB:
                 "fsub_statuses": [],
                 "join_requests": []
             }
-            
+
             # Filter by channel if specified
             filter_query = {"channel_id": channel_id} if channel_id else {}
-            
+
             # Export fsub statuses
             async for doc in self.fsub_status.find(filter_query):
                 doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
                 if "last_updated" in doc:
                     doc["last_updated"] = doc["last_updated"].isoformat()
                 export_data["fsub_statuses"].append(doc)
-            
+
             # Export join requests
             async for doc in self.request_sub.find(filter_query):
                 doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
@@ -527,7 +527,7 @@ class MongoDB:
                 if "last_updated" in doc:
                     doc["last_updated"] = doc["last_updated"].isoformat()
                 export_data["join_requests"].append(doc)
-            
+
             return export_data
         except Exception as e:
             print(f"Error exporting fsub data: {e}")
@@ -539,7 +539,7 @@ class MongoDB:
             fsub_count = await self.fsub_status.count_documents({})
             request_count = await self.request_sub.count_documents({})
             pending_requests = await self.request_sub.count_documents({"status": "pending"})
-            
+
             return {
                 "fsub_status_records": fsub_count,
                 "join_request_records": request_count,
@@ -726,7 +726,7 @@ class MongoDB:
             messages = await self.get_messages_settings()
             admins = await self.get_admins_list()
             shortner_settings = await self.get_shortner_settings()
-            
+
             return {
                 "bot_settings": bot_settings,
                 "messages": messages,
@@ -741,3 +741,53 @@ class MongoDB:
                 "admins": [],
                 "shortner_settings": {}
             }
+
+    ##############################################################
+    # ✅ BYPASS TRACKING FUNCTIONS
+    ##############################################################
+
+    async def add_bypass_log(self, user_id: int):
+        """Add bypass log for user"""
+        await self.user_data.update_one(
+            {"_id": f"bypass_{user_id}"},
+            {"$inc": {"bypass_count": 1}, "$set": {"last_bypass": datetime.now()}},
+            upsert=True
+        )
+
+    async def get_user_bypass_count(self, user_id: int) -> int:
+        """Get bypass count for specific user"""
+        doc = await self.user_data.find_one({"_id": f"bypass_{user_id}"})
+        return doc.get("bypass_count", 0) if doc else 0
+
+    async def get_total_bypass_stats(self) -> dict:
+        """Get total bypass statistics"""
+        total_bypass = 0
+        total_users = 0
+        bypass_list = []
+        
+        cursor = self.user_data.find({"_id": {"$regex": "^bypass_"}}).sort("bypass_count", -1)
+        async for doc in cursor:
+            user_id_str = doc["_id"].replace("bypass_", "")
+            try:
+                user_id = int(user_id_str)
+            except:
+                continue
+            
+            count = doc.get("bypass_count", 0)
+            last_bypass = doc.get("last_bypass", None)
+            
+            total_bypass += count
+            total_users += 1
+            bypass_list.append({
+                'user_id': user_id,
+                'bypass_count': count,
+                'last_bypass': last_bypass
+            })
+        
+        return {
+            'total_bypass': total_bypass,
+            'total_users': total_users,
+            'bypass_list': bypass_list
+        }
+
+    ##############################################################
