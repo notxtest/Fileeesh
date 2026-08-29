@@ -1,5 +1,6 @@
 import os
 import logging
+import random
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 
@@ -10,7 +11,16 @@ LOG_FILE_NAME = "bot.log"
 PORT = '5010'
 OWNER_ID = int(os.getenv('OWNER_ID'))
 
-MSG_EFFECT = 5046509860389126442
+
+
+MSG_EFFECT = [
+    5104841245755180586,  # 🔥
+    5107584321108051014,  # 👍
+    5104858069142078462,  # 👎
+    5044134455711629726,  # ❤️
+    5046509860389126442,  # 🎉
+    5046589136895476101,  # 💩
+]
 
 SHORT_URL = "linkshortify.com"
 SHORT_API = "" 
