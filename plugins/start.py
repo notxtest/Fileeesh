@@ -8,6 +8,7 @@ from plugins.shortner import get_short
 from helper.helper_func import get_messages, force_sub, decode, batch_auto_del_notification
 import asyncio
 import secrets
+import random
 from datetime import datetime
 
 
@@ -1130,7 +1131,7 @@ async def start_command(
                 chat_id=message.chat.id,
                 photo=photo,
                 caption=start_caption,
-                message_effect_id=MSG_EFFECT,
+                message_effect_id=random.choice(MSG_EFFECT),
                 reply_markup=InlineKeyboardMarkup(
                     buttons
                 )
@@ -1141,7 +1142,7 @@ async def start_command(
             await client.send_message(
                 chat_id=message.chat.id,
                 text=start_caption,
-                message_effect_id=MSG_EFFECT,
+                message_effect_id=random.choice(MSG_EFFECT),
                 reply_markup=InlineKeyboardMarkup(
                     buttons
                 )
