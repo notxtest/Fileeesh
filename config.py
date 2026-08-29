@@ -1,7 +1,5 @@
 import os
 import logging
-import secrets
-import time
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 
@@ -17,6 +15,11 @@ MSG_EFFECT = 5046509860389126442
 SHORT_URL = "linkshortify.com"
 SHORT_API = "" 
 SHORT_TUT = "https://t.me/+5qAwb0OP6-02MTdl"
+
+# Bypass Protection
+# User must stay on the Open Link page for this many seconds.
+# If the user returns before this time, bypass will be detected.
+BYPASS_TIME = 60
 
 # Bot Configuration
 SESSION = os.getenv('SESSION')
@@ -37,54 +40,6 @@ ADMINS = [7171541681, 7171541681]
 DISABLE_BTN = True
 PROTECT = True
 
-# Short Link Token Storage
-short_link_tokens = {}
-
-def generate_short_token(user_id, base64_string):
-    """Generate unique token for short link"""
-    try:
-        timestamp = int(time.time())
-        token = secrets.token_hex(8)
-        short_link_tokens[token] = {
-            'user_id': user_id,
-            'base64_string': base64_string,
-            'timestamp': timestamp
-        }
-        return f"yu3elk_{base64_string}_{token}_7"
-    except Exception as e:
-        print(f"[Token Generation Error] {e}")
-        return None
-
-def verify_short_token(user_id, payload):
-    """Verify token and check time"""
-    try:
-        parts = payload.split('_')
-        if len(parts) != 3:
-            return None, None, 0
-
-        base64_string = parts[0]
-        token = parts[1]
-
-        if token not in short_link_tokens:
-            return None, base64_string, 0
-
-        token_data = short_link_tokens[token]
-
-        if token_data['user_id'] != user_id:
-            return None, base64_string, 0
-
-        time_diff = time.time() - token_data['timestamp']
-        del short_link_tokens[token]
-
-        if time_diff < 60:
-            return "bypass", base64_string, time_diff
-
-        return "valid", base64_string, time_diff
-
-    except Exception as e:
-        print(f"[Token Verification Error] {e}")
-        return None, None, 0
-
 # Messages Configuration
 MESSAGES = {
     "START": "<b>›› ʜᴇʏ!!, {first} ~ <blockquote>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴏᴜʀ ʙᴏᴛ. ɪ ᴀᴍ ʜᴇʀᴇ ᴛᴏ ʜᴇʟᴘ ʏᴏᴜ ꜰɪɴᴅ ᴀɴᴅ ɢᴇᴛ ʏᴏᴜʀ ꜰɪʟᴇs ᴇᴀsɪʟʏ ᴀɴᴅ ǫᴜɪᴄᴋʟʏ.</blockquote></b>",
@@ -104,10 +59,16 @@ def LOGGER(name: str, client_name: str) -> logging.Logger:
         f"[%(asctime)s - %(levelname)s] - {client_name} - %(name)s - %(message)s",
         datefmt='%d-%b-%y %H:%M:%S'
     )
-    file_handler = RotatingFileHandler(LOG_FILE_NAME, maxBytes=50_000_000, backupCount=10)
+    file_handler = RotatingFileHandler(
+        LOG_FILE_NAME,
+        maxBytes=50_000_000,
+        backupCount=10
+    )
     file_handler.setFormatter(formatter)
+
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
+
     logger.setLevel(logging.INFO)
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
