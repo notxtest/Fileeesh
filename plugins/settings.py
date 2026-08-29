@@ -12,11 +12,11 @@ async def settings(client, query):
     total_fsub = len(client.fsub_dict)
     request_enabled = sum(1 for data in client.fsub_dict.values() if data[2])
     timer_enabled = sum(1 for data in client.fsub_dict.values() if data[3] > 0)
-    
+
     # Count DB channels
     total_db_channels = len(getattr(client, 'db_channels', {}))
     primary_db = getattr(client, 'primary_db_channel', client.db)
-    
+
     msg = f"""<blockquote>✦ sᴇᴛᴛɪɴɢs ᴏғ @{client.username}</blockquote>
 ›› **ꜰꜱᴜʙ ᴄʜᴀɴɴᴇʟs:** `{total_fsub}` (ʀᴇǫᴜᴇsᴛ: {request_enabled}, ᴛɪᴍᴇʀ: {timer_enabled})
 ›› **ᴅʙ ᴄʜᴀɴɴᴇʟs:** `{total_db_channels}` (ᴘʀɪᴍᴀʀʏ: `{primary_db}`)
@@ -54,11 +54,11 @@ async def settings_page_2(client, query):
     total_fsub = len(client.fsub_dict)
     request_enabled = sum(1 for data in client.fsub_dict.values() if data[2])
     timer_enabled = sum(1 for data in client.fsub_dict.values() if data[3] > 0)
-    
+
     # Count DB channels
     total_db_channels = len(getattr(client, 'db_channels', {}))
     primary_db = getattr(client, 'primary_db_channel', client.db)
-    
+
     msg = f"""<blockquote>✦ sᴇᴛᴛɪɴɢs ᴏғ @{client.username}</blockquote>
 ›› **ꜰsᴜʙ ᴄʜᴀɴɴᴇʟs:** `{total_fsub}` (ʀᴇǫᴜᴇsᴛ: {request_enabled}, ᴛɪᴍᴇʀ: {timer_enabled})
 ›› **ᴅʙ ᴄʜᴀɴɴᴇʟs:** `{total_db_channels}` (ᴘʀɪᴍᴀʀʏ: `{primary_db}`)
@@ -100,11 +100,11 @@ async def fsub(client, query):
             request_status = "✓ ʀᴇѦᴜᴇsᴛ" if channel_data[2] else "✗ ʀᴇѦᴜᴇsᴛ"
             timer_status = f"ᴛɪᴍᴇʀ: {channel_data[3]}ᴍ" if channel_data[3] > 0 else "ᴛɪᴍᴇʀ: ∞"
             channel_list.append(f"• `{channel_name}` (`{channel_id}`) - {request_status}, {timer_status}")
-        
+
         channels_display = "\n".join(channel_list)
     else:
         channels_display = "_ɴᴏ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ ᴄʜᴀɴɴᴇʟs ᴄᴏɴғɪɢᴜʀᴇᴅ_"
-    
+
     msg = f"""<blockquote>✦ ꜰᴏʀᴄᴇ sᴜʙsᴄʀɪᴘᴛɪᴏɴ sᴇᴛᴛɪɴɢs</blockquote>
 ›› **ᴄᴏɴғɪɢᴜʀᴇᴅ ᴄʜᴀɴɴᴇʟs:**
 {channels_display}
@@ -124,7 +124,7 @@ __ᴜsᴇ ᴛʜᴇ ᴀᴘᴘʀᴏᴘʀɪᴀᴛᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ
 async def db_channels(client, query):
     if not query.from_user.id in client.admins:
         return await query.answer('✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!', show_alert=True)
-    
+
     # Create a formatted list of DB channels
     db_channels = getattr(client, 'db_channels', {})
     if db_channels:
@@ -134,14 +134,14 @@ async def db_channels(client, query):
             is_primary = "✓ ᴘʀɪᴍᴀʀʏ" if channel_data.get('is_primary', False) else "• sᴇᴄᴏɴᴅᴀʀʏ"
             is_active = "✓ ᴀᴄᴛɪᴠᴇ" if channel_data.get('is_active', True) else "✗ ɪɴᴀᴄᴛɪᴠᴇ"
             channel_list.append(f"• `{channel_name}` (`{channel_id_str}`)\n  {is_primary} | {is_active}")
-        
+
         channels_display = "\n\n".join(channel_list)
     else:
         channels_display = "_ɴᴏ ᴅᴀᴛᴀʙᴀsᴇ ᴄʜᴀɴɴᴇʟs ᴄᴏɴғɪɢᴜʀᴇᴅ_"
-    
+
     # Show current primary DB channel
     primary_db = getattr(client, 'primary_db_channel', client.db)
-    
+
     msg = f"""<blockquote>✦ ᴅᴀᴛᴀʙᴀsᴇ ᴄʜᴀɴɴᴇʟs sᴇᴛᴛɪɴɢs</blockquote>
 ›› **ᴄᴜʀʀᴇɴᴛ ᴘʀɪᴍᴀʀʏ ᴅʙ:** `{primary_db}`
 ›› **ᴛᴏᴛᴀʟ ᴅʙ ᴄʜᴀɴɴᴇʟs:** `{len(db_channels)}`
@@ -165,7 +165,7 @@ __ᴜsᴇ ᴛʜᴇ ᴀᴘᴘʀᴏᴘʀɪᴀᴛᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ
 async def add_db_channel(client, query):
     if not query.from_user.id in client.admins:
         return await query.answer('✗ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!', show_alert=True)
-    
+
     await query.answer()
     msg = f"""<blockquote>✦ ᴀᴅᴅ ɴᴇᴡ ᴅᴀᴛᴀʙᴀsᴇ ᴄʜᴀɴɴᴇʟ</blockquote>
 ›› **ᴄᴜʀʀᴇɴᴛ ᴅʙ ᴄʜᴀɴɴᴇʟs:** `{len(getattr(client, 'db_channels', {}))}`
@@ -174,30 +174,30 @@ __sᴇɴᴅ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ɪᴅ (ɴᴇɢᴀᴛɪᴠᴇ ɪɴᴛᴇɢ
 
 **ᴇxᴀᴍᴘʟᴇ:** `-1001234567675`
 **ɴᴏᴛᴇ:** ᴍᴀᴋᴇ sᴜʀᴇ ᴛʜᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!"""
-    
+
     await query.message.edit_text(msg)
     try:
         res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
         channel_id_text = res.text.strip()
-        
+
         if not channel_id_text.lstrip('-').isdigit():
             return await query.message.edit_text("**✗ ɪɴᴠᴀʟɪᴅ ᴄʜᴀɴɴᴇʟ ɪᴅ! ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ɴᴇɢᴀᴛɪᴠᴇ ɪɴᴛᴇɢᴇʀ.**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         channel_id = int(channel_id_text)
-        
+
         # Check if channel already exists
         db_channels = getattr(client, 'db_channels', {})
         if str(channel_id) in db_channels:
             return await query.message.edit_text(f"**✗ ᴄʜᴀɴɴᴇʟ `{channel_id}` ɪs ᴀʟʀᴇᴀᴅʏ ᴀᴅᴅᴇᴅ ᴀs ᴀ ᴅʙ ᴄʜᴀɴɴᴇʟ!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         # Verify bot can access the channel
         try:
             chat = await client.get_chat(channel_id)
-            test_msg = await client.send_message(chat_id=channel_id, text="ᴛᴇsᴛɪɴɢ ᴅʙ ᴄʜᴀɴɴᴇʟ ᴀᴄᴄᴇss - @Okabe_xRintarou")
+            test_msg = await client.send_message(chat_id=channel_id, text="ᴛᴇsᴛɪɴɢ ᴅʙ ᴄʜᴀɴɴᴇʟ ᴀᴄᴄᴇss - @CineVines_Bot")
             await test_msg.delete()
-            
+
             # Add channel to database
             channel_data = {
                 'name': chat.title,
@@ -205,26 +205,26 @@ __sᴇɴᴅ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ɪᴅ (ɴᴇɢᴀᴛɪᴠᴇ ɪɴᴛᴇɢ
                 'is_active': True,
                 'added_by': query.from_user.id
             }
-            
+
             await client.mongodb.add_db_channel(channel_id, channel_data)
-            
+
             # Update client attributes
             if not hasattr(client, 'db_channels'):
                 client.db_channels = {}
             client.db_channels[str(channel_id)] = channel_data
-            
+
             # Set as primary if it's the first channel
             if channel_data['is_primary']:
                 client.primary_db_channel = channel_id
                 await client.mongodb.set_primary_db_channel(channel_id)
-            
+
             await query.message.edit_text(f"""**✓ ᴅᴀᴛᴀʙᴀsᴇ ᴄʜᴀɴɴᴇʟ ᴀᴅᴅᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ!**
 
 ›› **ᴄʜᴀɴɴᴇʟ:** `{chat.title}`
 ›› **ɪᴅ:** `{channel_id}`
 ›› **sᴛᴀᴛᴜs:** {'ᴘʀɪᴍᴀʀʏ' if channel_data['is_primary'] else 'sᴇᴄᴏɴᴅᴀʀʏ'}""", 
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         except Exception as e:
             await query.message.edit_text(f"""**✗ ᴇʀʀᴏʀ ᴀᴄᴄᴇssɪɴɢ ᴄʜᴀɴɴᴇʟ!**
 
@@ -235,7 +235,7 @@ __sᴇɴᴅ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ɪᴅ (ɴᴇɢᴀᴛɪᴠᴇ ɪɴᴛᴇɢ
 • ᴄʜᴀɴɴᴇʟ ɪᴅ ɪs ᴄᴏʀʀᴇᴄᴛ
 • ᴄʜᴀɴɴᴇʟ ᴇxɪsᴛs""", 
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('‹ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     except Exception as e:
         await query.message.edit_text(f"""**✗ ᴛɪᴍᴇᴏᴜᴛ ᴏʀ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ!**
 
@@ -248,53 +248,53 @@ __sᴇɴᴅ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ɪᴅ (ɴᴇɢᴀᴛɪᴠᴇ ɪɴᴛᴇɢ
 async def rm_db_channel(client, query):
     if not query.from_user.id in client.admins:
         return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!', show_alert=True)
-    
+
     await query.answer()
     db_channels = getattr(client, 'db_channels', {})
-    
+
     if not db_channels:
         return await query.message.edit_text("**❌ No database channels to remove!**", 
                                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     msg = f"""<blockquote>**Remove Database Channel:**</blockquote>
 **Available Channels:**
 """
-    
+
     for channel_id_str, channel_data in db_channels.items():
         channel_name = channel_data.get('name', 'Unknown')
         is_primary = " (Primary)" if channel_data.get('is_primary', False) else ""
         msg += f"• `{channel_name}` - `{channel_id_str}`{is_primary}\n"
-    
+
     msg += "\n__Send the channel ID you want to remove in the next 60 seconds!__"
-    
+
     await query.message.edit_text(msg)
     try:
         res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
         channel_id_text = res.text.strip()
-        
+
         if not channel_id_text.lstrip('-').isdigit():
             return await query.message.edit_text("**❌ Invalid channel ID!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         channel_id = int(channel_id_text)
-        
+
         if str(channel_id) not in db_channels:
             return await query.message.edit_text(f"**❌ Channel `{channel_id}` is not in the DB channels list!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         # Check if trying to remove primary channel
         if db_channels[str(channel_id)].get('is_primary', False) and len(db_channels) > 1:
             return await query.message.edit_text("**❌ Cannot remove primary channel!**\n\n__Please set another channel as primary first.__", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         # Remove from database and client
         channel_name = db_channels[str(channel_id)].get('name', 'Unknown')
         await client.mongodb.remove_db_channel(channel_id)
         del client.db_channels[str(channel_id)]
-        
+
         await query.message.edit_text(f"**✅ Database channel removed successfully!**\n\n**Removed:** `{channel_name}` (`{channel_id}`)", 
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     except Exception as e:
         await query.message.edit_text(f"**❌ Timeout or error occurred!**\n\n**Error:** `{str(e)}`", 
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
@@ -305,54 +305,54 @@ async def rm_db_channel(client, query):
 async def set_primary_db(client, query):
     if not query.from_user.id in client.admins:
         return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!', show_alert=True)
-    
+
     await query.answer()
     db_channels = getattr(client, 'db_channels', {})
-    
+
     if not db_channels:
         return await query.message.edit_text("**❌ No database channels available!**", 
                                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     msg = f"""<blockquote>**Set Primary Database Channel:**</blockquote>
 **Available Channels:**
 """
-    
+
     for channel_id_str, channel_data in db_channels.items():
         channel_name = channel_data.get('name', 'Unknown')
         is_primary = " (Current Primary)" if channel_data.get('is_primary', False) else ""
         msg += f"• `{channel_name}` - `{channel_id_str}`{is_primary}\n"
-    
+
     msg += "\n__Send the channel ID you want to set as primary in the next 60 seconds!__"
-    
+
     await query.message.edit_text(msg)
     try:
         res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
         channel_id_text = res.text.strip()
-        
+
         if not channel_id_text.lstrip('-').isdigit():
             return await query.message.edit_text("**❌ Invalid channel ID!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         channel_id = int(channel_id_text)
-        
+
         if str(channel_id) not in db_channels:
             return await query.message.edit_text(f"**❌ Channel `{channel_id}` is not in the DB channels list!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         # Set as primary
         await client.mongodb.set_primary_db_channel(channel_id)
-        
+
         # Update client attributes
         for ch_id, ch_data in client.db_channels.items():
             ch_data['is_primary'] = (int(ch_id) == channel_id)
-        
+
         client.primary_db_channel = channel_id
         client.db = channel_id  # Update current db reference
-        
+
         channel_name = db_channels[str(channel_id)].get('name', 'Unknown')
         await query.message.edit_text(f"**✅ Primary database channel updated!**\n\n**New Primary:** `{channel_name}` (`{channel_id}`)", 
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     except Exception as e:
         await query.message.edit_text(f"**❌ Timeout or error occurred!**\n\n**Error:** `{str(e)}`", 
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
@@ -363,47 +363,47 @@ async def set_primary_db(client, query):
 async def toggle_db_status(client, query):
     if not query.from_user.id in client.admins:
         return await query.answer('❌ ᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs!', show_alert=True)
-    
+
     await query.answer()
     db_channels = getattr(client, 'db_channels', {})
-    
+
     if not db_channels:
         return await query.message.edit_text("**❌ No database channels available!**", 
                                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     msg = f"""<blockquote>**Toggle Channel Status:**</blockquote>
 **Available Channels:**
 """
-    
+
     for channel_id_str, channel_data in db_channels.items():
         channel_name = channel_data.get('name', 'Unknown')
         status = "🟢 ᴀᴄᴛɪᴠᴇ" if channel_data.get('is_active', True) else "🔴 ɪɴᴀᴄᴛɪᴠᴇ"
         msg += f"• `{channel_name}` - `{channel_id_str}` ({status})\n"
-    
+
     msg += "\n__Send the channel ID you want to ᴀᴄᴛɪᴠᴇ/ɪɴᴀᴄᴛɪᴠᴇ status for in the next 60 seconds!__"
-    
+
     await query.message.edit_text(msg)
     try:
         res = await client.listen(user_id=query.from_user.id, filters=filters.text, timeout=60)
         channel_id_text = res.text.strip()
-        
+
         if not channel_id_text.lstrip('-').isdigit():
             return await query.message.edit_text("**❌ Invalid channel ID!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         channel_id = int(channel_id_text)
-        
+
         if str(channel_id) not in db_channels:
             return await query.message.edit_text(f"**❌ Channel `{channel_id}` is not in the DB channels list!**", 
                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-        
+
         # Toggle status
         new_status = await client.mongodb.toggle_db_channel_status(channel_id)
-        
+
         if new_status is not None:
             # Update client attributes
             client.db_channels[str(channel_id)]['is_active'] = new_status
-            
+
             channel_name = db_channels[str(channel_id)].get('name', 'Unknown')
             status_text = "🟢 Active" if new_status else "🔴 Inactive"
             await query.message.edit_text(f"**✅ Channel status updated!**\n\n**Channel:** `{channel_name}` (`{channel_id}`)\n**New Status:** {status_text}", 
@@ -411,7 +411,7 @@ async def toggle_db_status(client, query):
         else:
             await query.message.edit_text("**❌ Failed to toggle channel status!**", 
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
-    
+
     except Exception as e:
         await query.message.edit_text(f"**❌ Timeout or error occurred!**\n\n**Error:** `{str(e)}`", 
                                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('◂ ʙᴀᴄᴋ', 'db_channels')]]))
