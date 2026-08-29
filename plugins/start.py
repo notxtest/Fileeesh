@@ -284,8 +284,7 @@ async def start_command(
                 active_session = (
                     await client.mongodb
                     .get_active_bypass_session(
-                        original_token,
-                        user_id
+                        original_token
                     )
                 )
 
