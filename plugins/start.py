@@ -34,22 +34,22 @@ async def start_command(client: Client, message: Message):
 
             is_short_link = False
             bypass_detected = False
-            
+
             if base64_string.startswith("yu3elk_"):
                 verification, extracted_payload, time_diff = verify_short_token(user_id, base64_string)
-                
+
                 if verification == "bypass":
                     bypass_detected = True
                     base64_string = extracted_payload
                     is_short_link = False
-                    
+
                 elif verification == "valid":
                     base64_string = extracted_payload
                     is_short_link = True
-                    
+
                 else:
                     return await message.reply("**Invalid link! Please use latest link.**")
-                
+
         except IndexError:
             return await message.reply("Invalid command format.")
 
@@ -57,9 +57,12 @@ async def start_command(client: Client, message: Message):
         shortner_enabled = getattr(client, 'shortner_enabled', True)
 
         if not is_user_pro and user_id != OWNER_ID and not is_short_link and shortner_enabled:
-            
+
             new_token_payload = generate_short_token(user_id, base64_string)
-            
+
+            if not new_token_payload:
+                return await message.reply("**Error generating token! Please try again.**")
+
             try:
                 short_link = get_short(f"https://t.me/{client.username}?start={new_token_payload}", client)
             except Exception as e:
@@ -70,9 +73,11 @@ async def start_command(client: Client, message: Message):
             tutorial_link = getattr(client, 'tutorial_link', "https://t.me/+5qAwb0OP6-02MTdl")
 
             if bypass_detected:
-                # Log bypass
-                await client.mongodb.add_bypass_log(user_id)
-                
+                try:
+                    await client.mongodb.add_bypass_log(user_id)
+                except Exception as e:
+                    client.LOGGER(__name__, client.name).warning(f"Error logging bypass: {e}")
+
                 short_caption = f"""<blockquote>⚠️ ʙʏᴘᴀss ᴅᴇᴛᴇᴄᴛᴇᴅ!
 
 sʜᴏʀᴛ ʟɪɴᴋ sᴋɪᴘ ᴍᴀᴛ ᴋᴀʀᴏ! ᴘʀᴏᴘᴇʀʟʏ ᴄᴏᴍᴘʟᴇᴛᴇ ᴋᴀʀᴏ!
@@ -91,7 +96,7 @@ sʜᴏʀᴛ ʟɪɴᴋ sᴋɪᴘ ᴍᴀᴛ ᴋᴀʀᴏ! ᴘʀᴏᴘᴇʀʟʏ ᴄ�
                 )
             else:
                 short_caption = client.messages.get("SHORT_MSG", "").format(first=message.from_user.first_name)
-                
+
                 await client.send_photo(
                     chat_id=message.chat.id,
                     photo=short_photo,
@@ -108,7 +113,6 @@ sʜᴏʀᴛ ʟɪɴᴋ sᴋɪᴘ ᴍᴀᴛ ᴋᴀʀᴏ! ᴘʀᴏᴘᴇʀʟʏ ᴄ�
                 )
             return
 
-        # File decode and send code (same as before)
         try:
             string = await decode(base64_string)
             argument = string.split("-")
@@ -284,38 +288,48 @@ sʜᴏʀᴛ ʟɪɴᴋ sᴋɪᴘ ᴍᴀᴛ ᴋᴀʀᴏ! ᴘʀᴏᴘᴇʀʟʏ ᴄ�
 
 @Client.on_callback_query(filters.regex("^tryagain_"))
 async def try_again_callback(client: Client, query: CallbackQuery):
-    await query.answer()
-    
-    await query.message.delete()
-    
-    base64_string = query.data.split("tryagain_", 1)[1]
-    user_id = query.from_user.id
-    
-    new_token_payload = generate_short_token(user_id, base64_string)
-    
     try:
-        short_link = get_short(f"https://t.me/{client.username}?start={new_token_payload}", client)
+        await query.answer()
+
+        await query.message.delete()
+
+        base64_string = query.data.split("tryagain_", 1)[1]
+        user_id = query.from_user.id
+
+        new_token_payload = generate_short_token(user_id, base64_string)
+
+        if not new_token_payload:
+            return await client.send_message(user_id, "**Error generating token! Please try again.**")
+
+        try:
+            short_link = get_short(f"https://t.me/{client.username}?start={new_token_payload}", client)
+        except Exception as e:
+            return await client.send_message(user_id, "Couldn't generate short link.")
+
+        short_photo = client.messages.get("SHORT_PIC", "")
+        tutorial_link = getattr(client, 'tutorial_link', "https://t.me/+5qAwb0OP6-02MTdl")
+        short_caption = client.messages.get("SHORT_MSG", "").format(first=query.from_user.first_name)
+
+        await client.send_photo(
+            chat_id=user_id,
+            photo=short_photo,
+            caption=short_caption,
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ", url=short_link),
+                    InlineKeyboardButton("ᴛᴜᴛᴏʀɪᴀʟ •", url=tutorial_link)
+                ],
+                [
+                    InlineKeyboardButton(" • ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", url="https://t.me/CineVines_Bot")
+                ]
+            ])
+        )
     except Exception as e:
-        return await client.send_message(user_id, "Couldn't generate short link.")
-    
-    short_photo = client.messages.get("SHORT_PIC", "")
-    tutorial_link = getattr(client, 'tutorial_link', "https://t.me/+5qAwb0OP6-02MTdl")
-    short_caption = client.messages.get("SHORT_MSG", "").format(first=query.from_user.first_name)
-    
-    await client.send_photo(
-        chat_id=user_id,
-        photo=short_photo,
-        caption=short_caption,
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("• ᴏᴘᴇɴ ʟɪɴᴋ", url=short_link),
-                InlineKeyboardButton("ᴛᴜᴛᴏʀɪᴀʟ •", url=tutorial_link)
-            ],
-            [
-                InlineKeyboardButton(" • ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", url="https://t.me/CineVines_Bot")
-            ]
-        ])
-    )
+        client.LOGGER(__name__, client.name).warning(f"Error in try_again_callback: {e}")
+        try:
+            await client.send_message(query.from_user.id, "**Something went wrong! Please try again.**")
+        except:
+            pass
 
 #===============================================================#
 
@@ -323,45 +337,49 @@ async def try_again_callback(client: Client, query: CallbackQuery):
 async def bypass_stats(client: Client, message: Message):
     if message.from_user.id not in client.admins:
         return await message.reply(client.reply_text)
-    
-    stats = await client.mongodb.get_total_bypass_stats()
-    
-    total_bypass = stats['total_bypass']
-    total_users = stats['total_users']
-    bypass_list = stats['bypass_list']
-    
-    msg = f"""<blockquote>🚫 ʙʏᴘᴀss sᴛᴀᴛɪsᴛɪᴄs</blockquote>
+
+    try:
+        stats = await client.mongodb.get_total_bypass_stats()
+
+        total_bypass = stats['total_bypass']
+        total_users = stats['total_users']
+        bypass_list = stats['bypass_list']
+
+        msg = f"""<blockquote>🚫 ʙʏᴘᴀss sᴛᴀᴛɪsᴛɪᴄs</blockquote>
 
 ›› **ᴛᴏᴛᴀʟ ʙʏᴘᴀss:** `{total_bypass}`
 ›› **ᴛᴏᴛᴀʟ ᴜsᴇʀs:** `{total_users}`
 
 <blockquote>📋 ᴛᴏᴘ ʙʏᴘᴀss ᴜsᴇʀs:</blockquote>
 """
-    
-    if bypass_list:
-        for i, user_data in enumerate(bypass_list[:10], 1):
-            user_id = user_data['user_id']
-            count = user_data['bypass_count']
-            last_bypass = user_data['last_bypass']
-            
-            try:
-                user = await client.get_users(user_id)
-                name = user.first_name
-                username = f"@{user.username}" if user.username else "No Username"
-            except:
-                name = "Unknown"
-                username = "No Username"
-            
-            if last_bypass:
-                last_time = last_bypass.strftime('%Y-%m-%d %H:%M:%S')
-            else:
-                last_time = "Unknown"
-            
-            msg += f"{i}. {name} ({username}) - `{count}` ʙʏᴘᴀss\n   ʟᴀsᴛ: `{last_time}`\n\n"
-    else:
-        msg += "_ɴᴏ ʙʏᴘᴀss ʀᴇᴄᴏʀᴅᴇᴅ ʏᴇᴛ_\n"
-    
-    await message.reply(msg)
+
+        if bypass_list:
+            for i, user_data in enumerate(bypass_list[:10], 1):
+                user_id = user_data['user_id']
+                count = user_data['bypass_count']
+                last_bypass = user_data['last_bypass']
+
+                try:
+                    user = await client.get_users(user_id)
+                    name = user.first_name
+                    username = f"@{user.username}" if user.username else "No Username"
+                except:
+                    name = "Unknown"
+                    username = "No Username"
+
+                if last_bypass:
+                    last_time = last_bypass.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    last_time = "Unknown"
+
+                msg += f"{i}. {name} ({username}) - `{count}` ʙʏᴘᴀss\n   ʟᴀsᴛ: `{last_time}`\n\n"
+        else:
+            msg += "_ɴᴏ ʙʏᴘᴀss ʀᴇᴄᴏʀᴅᴇᴅ ʏᴇᴛ_\n"
+
+        await message.reply(msg)
+    except Exception as e:
+        client.LOGGER(__name__, client.name).warning(f"Error in bypass_stats: {e}")
+        await message.reply("**Error fetching bypass stats!**")
 
 #===============================================================#
 
