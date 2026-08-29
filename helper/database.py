@@ -859,17 +859,12 @@ class MongoDB:
 
     async def get_active_bypass_session(
         self,
-        original_token: str,
-        user_id: int
+        original_token: str
     ):
-        """
-        Get the latest non-invalid session for an original token/user.
-        """
         try:
             return await self.bypass_data.find_one(
                 {
                     "original_token": original_token,
-                    "user_id": user_id,
                     "invalid": False
                 },
                 sort=[("created_at", -1)]
