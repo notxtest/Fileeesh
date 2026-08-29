@@ -1,40 +1,37 @@
+import os
 import logging
 from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Bot Configuration
 LOG_FILE_NAME = "bot.log"
 PORT = '5010'
-OWNER_ID = 7171541681
+OWNER_ID = int(os.getenv('OWNER_ID'))
 
 MSG_EFFECT = 5046509860389126442
 
-SHORT_URL = "linkshortify.com" # shortner url 
+SHORT_URL = "linkshortify.com"
 SHORT_API = "" 
 SHORT_TUT = "https://t.me/+5qAwb0OP6-02MTdl"
 
 # Bot Configuration
-SESSION = "yato"
-TOKEN = "8966687209:AAHM3X1grcK1RNREPD9vvU0ebA9uFPLTl7c"
-API_ID = "23640310"
-API_HASH = "079f8339732e35e032a64ee020e0b90b"
+SESSION = os.getenv('SESSION')
+TOKEN = os.getenv('TOKEN')
+API_ID = os.getenv('API_ID')
+API_HASH = os.getenv('API_HASH')
 WORKERS = 5
 
-DB_URI = "mongodb+srv://krishnaonly999:Krishdiya07@cluster0.h4rzpxv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "Cluster0"
+DB_URI = os.getenv('DB_URI')
+DB_NAME = os.getenv('DB_NAME')
 
-FSUBS = [[-1004451251761, True, 10]] # Force Subscription Channels [channel_id, request_enabled, timer_in_minutes]
-# Database Channel (Primary)
-DB_CHANNEL = -1004368668083   # just put channel id dont add ""
-# Multiple Database Channels (can be set via bot settings)
-# DB_CHANNELS = {
-#     "-1002595092736": {"name": "Primary DB", "is_primary": True, "is_active": True},
-#     "-1001234567890": {"name": "Secondary DB", "is_primary": False, "is_active": True}
-# }
-# Auto Delete Timer (seconds)
+FSUBS = [[-1004451251761, True, 10]]
+DB_CHANNEL = -1004368668083
+
 AUTO_DEL = 300
-# Admin IDs
 ADMINS = [7171541681, 7171541681]
-# Bot Settings
+
 DISABLE_BTN = True
 PROTECT = True
 
