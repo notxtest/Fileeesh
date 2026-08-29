@@ -12,8 +12,9 @@ class MongoDB:
             instance.user_data = instance.db["users"]
             instance.channel_data = instance.db["channels"]
             instance.premium_users = instance.db['pros']
-            instance.fsub_status = instance.db['fsub_status']
-            instance.request_sub = instance.db['request_sub']
+            instance.fsub_status = instance.db['fsub_status']  # New collection for fsub status tracking
+            instance.request_sub = instance.db['request_sub']  # New collection for join request tracking
+            instance.bypass_data = instance.db['bypass_data']
             cls._instances[(uri, db_name)] = instance
         return cls._instances[(uri, db_name)]
 
@@ -79,18 +80,18 @@ class MongoDB:
         if not doc:
             return False
         if 'expiry_date' not in doc:
-            return True
+            return True  # Legacy premium users without expiry date
         if doc['expiry_date'] is None:
-            return True
+            return True  # Permanent premium users
         return doc['expiry_date'] > datetime.now()
 
     async def get_pros_list(self):
         current_time = datetime.now()
         cursor = self.premium_users.find({
             '$or': [
-                {'expiry_date': None},
-                {'expiry_date': {'$exists': False}},
-                {'expiry_date': {'$gt': current_time}}
+                {'expiry_date': None},  # Permanent premium users
+                {'expiry_date': {'$exists': False}},  # Legacy premium users
+                {'expiry_date': {'$gt': current_time}}  # Active premium users
             ]
         })
         return [doc['_id'] async for doc in cursor]
@@ -128,6 +129,7 @@ class MongoDB:
     # ✅ FSUB CHANNELS FUNCTIONS
 
     async def set_fsub_channels(self, fsub_data: dict):
+        """Store fsub channels data to database for persistence across bot restarts"""
         await self.user_data.update_one(
             {"_id": "fsub_channels"},
             {"$set": {"channels": fsub_data}},
@@ -135,15 +137,18 @@ class MongoDB:
         )
 
     async def get_fsub_channels(self) -> dict:
+        """Get fsub channels data from database"""
         data = await self.user_data.find_one({"_id": "fsub_channels"})
         return data.get("channels", {}) if data else {}
 
     async def add_fsub_channel(self, channel_id: int, channel_data: list):
+        """Add a single fsub channel to database"""
         current_data = await self.get_fsub_channels()
         current_data[str(channel_id)] = channel_data
         await self.set_fsub_channels(current_data)
 
     async def remove_fsub_channel(self, channel_id: int):
+        """Remove a single fsub channel from database"""
         current_data = await self.get_fsub_channels()
         current_data.pop(str(channel_id), None)
         await self.set_fsub_channels(current_data)
@@ -151,6 +156,7 @@ class MongoDB:
     # ✅ SHORTNER SETTINGS FUNCTIONS
 
     async def set_shortner_settings(self, shortner_data: dict):
+        """Store shortner settings to database for persistence across bot restarts"""
         await self.user_data.update_one(
             {"_id": "shortner_settings"},
             {"$set": {"settings": shortner_data}},
@@ -158,24 +164,29 @@ class MongoDB:
         )
 
     async def get_shortner_settings(self) -> dict:
+        """Get shortner settings from database"""
         data = await self.user_data.find_one({"_id": "shortner_settings"})
         return data.get("settings", {}) if data else {}
 
     async def update_shortner_setting(self, key: str, value: str):
+        """Update a single shortner setting"""
         current_data = await self.get_shortner_settings()
         current_data[key] = value
         await self.set_shortner_settings(current_data)
 
     async def get_shortner_status(self) -> bool:
+        """Get shortner on/off status"""
         settings = await self.get_shortner_settings()
-        return settings.get('enabled', True)
+        return settings.get('enabled', True)  # Default is enabled
 
     async def set_shortner_status(self, enabled: bool):
+        """Set shortner on/off status"""
         await self.update_shortner_setting('enabled', enabled)
 
     # ✅ FSUB STATUS COLLECTION FUNCTIONS
 
     async def update_fsub_status(self, user_id: int, channel_id: int, status: str):
+        """Update user's subscription status for a specific channel"""
         await self.fsub_status.update_one(
             {"user_id": user_id, "channel_id": channel_id},
             {"$set": {"status": status, "last_updated": datetime.now()}},
@@ -183,13 +194,16 @@ class MongoDB:
         )
 
     async def get_fsub_status(self, user_id: int, channel_id: int) -> str:
+        """Get user's subscription status for a specific channel"""
         doc = await self.fsub_status.find_one({"user_id": user_id, "channel_id": channel_id})
         return doc.get("status") if doc else None
 
     async def remove_fsub_status(self, user_id: int, channel_id: int):
+        """Remove user's fsub status record"""
         await self.fsub_status.delete_one({"user_id": user_id, "channel_id": channel_id})
 
     async def get_user_fsub_statuses(self, user_id: int) -> dict:
+        """Get all fsub statuses for a user"""
         cursor = self.fsub_status.find({"user_id": user_id})
         statuses = {}
         async for doc in cursor:
@@ -197,12 +211,14 @@ class MongoDB:
         return statuses
 
     async def clear_expired_fsub_statuses(self, days: int = 7):
+        """Clear fsub status records older than specified days"""
         cutoff_date = datetime.now() - timedelta(days=days)
         await self.fsub_status.delete_many({"last_updated": {"$lt": cutoff_date}})
 
     # ✅ REQUEST SUB COLLECTION FUNCTIONS
 
     async def add_join_request(self, user_id: int, channel_id: int, request_id: int = None):
+        """Record a join request submission"""
         await self.request_sub.update_one(
             {"user_id": user_id, "channel_id": channel_id},
             {"$set": {
@@ -215,23 +231,28 @@ class MongoDB:
         )
 
     async def update_join_request_status(self, user_id: int, channel_id: int, status: str):
+        """Update join request status (pending, approved, rejected)"""
         await self.request_sub.update_one(
             {"user_id": user_id, "channel_id": channel_id},
             {"$set": {"status": status, "last_updated": datetime.now()}}
         )
 
     async def get_join_request_status(self, user_id: int, channel_id: int) -> str:
+        """Get join request status"""
         doc = await self.request_sub.find_one({"user_id": user_id, "channel_id": channel_id})
         return doc.get("status") if doc else None
 
     async def has_submitted_join_request(self, user_id: int, channel_id: int) -> bool:
+        """Check if user has submitted a join request for channel"""
         doc = await self.request_sub.find_one({"user_id": user_id, "channel_id": channel_id})
         return doc is not None
 
     async def remove_join_request(self, user_id: int, channel_id: int):
+        """Remove join request record"""
         await self.request_sub.delete_one({"user_id": user_id, "channel_id": channel_id})
 
     async def get_pending_requests_for_channel(self, channel_id: int) -> list:
+        """Get all pending join requests for a channel"""
         cursor = self.request_sub.find({"channel_id": channel_id, "status": "pending"})
         requests = []
         async for doc in cursor:
@@ -243,27 +264,38 @@ class MongoDB:
         return requests
 
     async def clear_old_join_requests(self, days: int = 30):
+        """Clear join request records older than specified days"""
         cutoff_date = datetime.now() - timedelta(days=days)
         await self.request_sub.delete_many({"submitted_at": {"$lt": cutoff_date}})
 
     async def cleanup_database(self):
+        """Perform comprehensive database maintenance - clean old records and validate data"""
         try:
+            # Clean old fsub status records (older than 7 days)
             await self.clear_expired_fsub_statuses(7)
+            # Clean old join request records (older than 30 days)
             await self.clear_old_join_requests(30)
+
+            # Additional cleanup for orphaned records
             await self.cleanup_orphaned_records()
+
             return True
         except Exception as e:
             print(f"Database cleanup error: {e}")
             return False
 
     async def cleanup_orphaned_records(self):
+        """Clean up records that are no longer valid"""
         try:
+            # Remove fsub status records for users who no longer exist
             users = await self.full_userbase()
             user_ids_set = set(users)
 
+            # Clean fsub_status collection
             async for doc in self.fsub_status.find({"user_id": {"$nin": users}}):
                 await self.fsub_status.delete_one({"_id": doc["_id"]})
 
+            # Clean request_sub collection
             async for doc in self.request_sub.find({"user_id": {"$nin": users}}):
                 await self.request_sub.delete_one({"_id": doc["_id"]})
 
@@ -273,25 +305,30 @@ class MongoDB:
             return False
 
     async def get_comprehensive_fsub_statistics(self):
+        """Get detailed statistics about fsub system"""
         try:
+            # Basic counts
             fsub_count = await self.fsub_status.count_documents({})
             request_count = await self.request_sub.count_documents({})
             pending_requests = await self.request_sub.count_documents({"status": "pending"})
             approved_requests = await self.request_sub.count_documents({"status": "approved"})
             rejected_requests = await self.request_sub.count_documents({"status": "rejected"})
 
+            # Status breakdown
             status_breakdown = {}
             async for doc in self.fsub_status.aggregate([
                 {"$group": {"_id": "$status", "count": {"$sum": 1}}}
             ]):
                 status_breakdown[doc["_id"]] = doc["count"]
 
+            # Channel-wise statistics
             channel_stats = {}
             async for doc in self.fsub_status.aggregate([
                 {"$group": {"_id": "$channel_id", "count": {"$sum": 1}}}
             ]):
                 channel_stats[doc["_id"]] = doc["count"]
 
+            # Recent activity (last 24 hours)
             from datetime import datetime, timedelta
             yesterday = datetime.now() - timedelta(days=1)
             recent_fsub_updates = await self.fsub_status.count_documents(
@@ -319,9 +356,12 @@ class MongoDB:
             return {}
 
     async def get_user_activity_summary(self, user_id: int):
+        """Get comprehensive activity summary for a specific user"""
         try:
+            # Get all fsub statuses
             fsub_statuses = await self.get_user_fsub_statuses(user_id)
 
+            # Get join request history
             join_requests = []
             async for doc in self.request_sub.find({"user_id": user_id}):
                 join_requests.append({
@@ -331,7 +371,10 @@ class MongoDB:
                     "last_updated": doc["last_updated"]
                 })
 
+            # Check if user is banned
             is_banned = await self.is_banned(user_id)
+
+            # Check if user is premium
             is_premium = await self.is_pro(user_id)
 
             return {
@@ -348,9 +391,12 @@ class MongoDB:
             return {}
 
     async def get_channel_activity_summary(self, channel_id: int):
+        """Get comprehensive activity summary for a specific channel"""
         try:
+            # Get all users in channel
             channel_users = await self.get_channel_users(channel_id)
 
+            # Get fsub status breakdown for this channel
             status_counts = {}
             async for doc in self.fsub_status.aggregate([
                 {"$match": {"channel_id": channel_id}},
@@ -358,6 +404,7 @@ class MongoDB:
             ]):
                 status_counts[doc["_id"]] = doc["count"]
 
+            # Get join request stats for this channel
             request_stats = {}
             async for doc in self.request_sub.aggregate([
                 {"$match": {"channel_id": channel_id}},
@@ -365,6 +412,7 @@ class MongoDB:
             ]):
                 request_stats[doc["_id"]] = doc["count"]
 
+            # Get recent activity (last 7 days)
             from datetime import datetime, timedelta
             week_ago = datetime.now() - timedelta(days=7)
             recent_joins = await self.fsub_status.count_documents({
@@ -393,6 +441,7 @@ class MongoDB:
             return {}
 
     async def bulk_update_user_statuses(self, updates: list):
+        """Perform bulk updates for user statuses - useful for synchronization"""
         try:
             operations = []
             for update in updates:
@@ -422,15 +471,23 @@ class MongoDB:
             return None
 
     async def sync_channel_members(self, channel_id: int, current_members: list):
+        """Synchronize database with actual channel members"""
         try:
+            # Get stored users for this channel
             stored_users = await self.get_channel_users(channel_id)
+
+            # Find users to add (in channel but not in database)
             users_to_add = set(current_members) - set(stored_users)
+
+            # Find users to remove (in database but not in channel)
             users_to_remove = set(stored_users) - set(current_members)
 
+            # Add new users
             for user_id in users_to_add:
                 await self.add_channel_user(channel_id, user_id)
                 await self.update_fsub_status(user_id, channel_id, "joined")
 
+            # Remove old users
             for user_id in users_to_remove:
                 await self.remove_channel_user(channel_id, user_id)
                 await self.update_fsub_status(user_id, channel_id, "left")
@@ -445,6 +502,7 @@ class MongoDB:
             return {"synced": False, "error": str(e)}
 
     async def export_fsub_data(self, channel_id: int = None):
+        """Export force subscription data for backup or analysis"""
         try:
             export_data = {
                 "export_timestamp": datetime.now().isoformat(),
@@ -452,16 +510,19 @@ class MongoDB:
                 "join_requests": []
             }
 
+            # Filter by channel if specified
             filter_query = {"channel_id": channel_id} if channel_id else {}
 
+            # Export fsub statuses
             async for doc in self.fsub_status.find(filter_query):
-                doc["_id"] = str(doc["_id"])
+                doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
                 if "last_updated" in doc:
                     doc["last_updated"] = doc["last_updated"].isoformat()
                 export_data["fsub_statuses"].append(doc)
 
+            # Export join requests
             async for doc in self.request_sub.find(filter_query):
-                doc["_id"] = str(doc["_id"])
+                doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
                 if "submitted_at" in doc:
                     doc["submitted_at"] = doc["submitted_at"].isoformat()
                 if "last_updated" in doc:
@@ -474,6 +535,7 @@ class MongoDB:
             return None
 
     async def get_fsub_statistics(self):
+        """Get statistics about fsub collections"""
         try:
             fsub_count = await self.fsub_status.count_documents({})
             request_count = await self.request_sub.count_documents({})
@@ -491,6 +553,7 @@ class MongoDB:
     # ✅ DB CHANNELS FUNCTIONS
 
     async def set_db_channels(self, db_channels_data: dict):
+        """Store DB channels data to database for persistence across bot restarts"""
         await self.user_data.update_one(
             {"_id": "db_channels"},
             {"$set": {"channels": db_channels_data}},
@@ -498,26 +561,31 @@ class MongoDB:
         )
 
     async def get_db_channels(self) -> dict:
+        """Get DB channels data from database"""
         data = await self.user_data.find_one({"_id": "db_channels"})
         return data.get("channels", {}) if data else {}
 
     async def add_db_channel(self, channel_id: int, channel_data: dict):
+        """Add a single DB channel to database"""
         current_data = await self.get_db_channels()
         current_data[str(channel_id)] = channel_data
         await self.set_db_channels(current_data)
 
     async def remove_db_channel(self, channel_id: int):
+        """Remove a single DB channel from database"""
         current_data = await self.get_db_channels()
         current_data.pop(str(channel_id), None)
         await self.set_db_channels(current_data)
 
     async def update_db_channel(self, channel_id: int, channel_data: dict):
+        """Update a single DB channel in database"""
         current_data = await self.get_db_channels()
         if str(channel_id) in current_data:
             current_data[str(channel_id)].update(channel_data)
             await self.set_db_channels(current_data)
 
     async def get_primary_db_channel(self) -> int:
+        """Get the primary DB channel ID"""
         db_channels = await self.get_db_channels()
         for channel_id_str, channel_data in db_channels.items():
             if channel_data.get('is_primary', False):
@@ -525,14 +593,18 @@ class MongoDB:
         return None
 
     async def set_primary_db_channel(self, channel_id: int):
+        """Set a DB channel as primary (remove primary from others)"""
         db_channels = await self.get_db_channels()
+        # Remove primary status from all channels
         for ch_id, ch_data in db_channels.items():
             ch_data['is_primary'] = False
+        # Set new primary channel
         if str(channel_id) in db_channels:
             db_channels[str(channel_id)]['is_primary'] = True
         await self.set_db_channels(db_channels)
 
     async def get_active_db_channels(self) -> dict:
+        """Get all active DB channels"""
         db_channels = await self.get_db_channels()
         active_channels = {}
         for channel_id_str, channel_data in db_channels.items():
@@ -541,6 +613,7 @@ class MongoDB:
         return active_channels
 
     async def toggle_db_channel_status(self, channel_id: int):
+        """Toggle DB channel active/inactive status"""
         db_channels = await self.get_db_channels()
         if str(channel_id) in db_channels:
             current_status = db_channels[str(channel_id)].get('is_active', True)
@@ -552,6 +625,7 @@ class MongoDB:
     # ✅ BOT SETTINGS FUNCTIONS
 
     async def set_bot_settings(self, settings_data: dict):
+        """Store bot settings to database for persistence across bot restarts"""
         await self.user_data.update_one(
             {"_id": "bot_settings"},
             {"$set": {"settings": settings_data}},
@@ -559,21 +633,25 @@ class MongoDB:
         )
 
     async def get_bot_settings(self) -> dict:
+        """Get bot settings from database"""
         data = await self.user_data.find_one({"_id": "bot_settings"})
         return data.get("settings", {}) if data else {}
 
     async def update_bot_setting(self, key: str, value):
+        """Update a single bot setting"""
         current_data = await self.get_bot_settings()
         current_data[key] = value
         await self.set_bot_settings(current_data)
 
     async def get_bot_setting(self, key: str, default=None):
+        """Get a single bot setting with default fallback"""
         settings = await self.get_bot_settings()
         return settings.get(key, default)
 
     # ✅ MESSAGES SETTINGS FUNCTIONS
 
     async def set_messages_settings(self, messages_data: dict):
+        """Store messages settings to database for persistence across bot restarts"""
         await self.user_data.update_one(
             {"_id": "messages_settings"},
             {"$set": {"messages": messages_data}},
@@ -581,21 +659,25 @@ class MongoDB:
         )
 
     async def get_messages_settings(self) -> dict:
+        """Get messages settings from database"""
         data = await self.user_data.find_one({"_id": "messages_settings"})
         return data.get("messages", {}) if data else {}
 
     async def update_message_setting(self, key: str, value: str):
+        """Update a single message setting"""
         current_data = await self.get_messages_settings()
         current_data[key] = value
         await self.set_messages_settings(current_data)
 
     async def get_message_setting(self, key: str, default: str = ""):
+        """Get a single message setting with default fallback"""
         messages = await self.get_messages_settings()
         return messages.get(key, default)
 
     # ✅ ADMIN SETTINGS FUNCTIONS
 
     async def set_admins_list(self, admins_list: list):
+        """Store admins list to database for persistence across bot restarts"""
         await self.user_data.update_one(
             {"_id": "admins_list"},
             {"$set": {"admins": admins_list}},
@@ -603,10 +685,12 @@ class MongoDB:
         )
 
     async def get_admins_list(self) -> list:
+        """Get admins list from database"""
         data = await self.user_data.find_one({"_id": "admins_list"})
         return data.get("admins", []) if data else []
 
     async def add_admin(self, admin_id: int):
+        """Add an admin to the database"""
         current_admins = await self.get_admins_list()
         if admin_id not in current_admins:
             current_admins.append(admin_id)
@@ -615,6 +699,7 @@ class MongoDB:
         return False
 
     async def remove_admin(self, admin_id: int):
+        """Remove an admin from the database"""
         current_admins = await self.get_admins_list()
         if admin_id in current_admins:
             current_admins.remove(admin_id)
@@ -625,6 +710,7 @@ class MongoDB:
     # ✅ BATCH SETTINGS FUNCTIONS
 
     async def save_all_settings(self, bot_settings: dict, messages: dict, admins: list):
+        """Save all settings in a single transaction for efficiency"""
         try:
             await self.set_bot_settings(bot_settings)
             await self.set_messages_settings(messages)
@@ -634,7 +720,291 @@ class MongoDB:
             print(f"Error saving all settings: {e}")
             return False
 
+# ===============================================================
+    # ✅ BYPASS DETECTION / TOKEN SESSION FUNCTIONS
+    # ===============================================================
+
+    async def create_bypass_session(
+        self,
+        original_token: str,
+        current_token: str,
+        user_id: int
+    ):
+        """
+        Create/update the current token session.
+
+        original_token:
+            The original /start token, for example:
+            Z2V0LTU3MjQ5MDE0MDgwNzMx
+
+        current_token:
+            The token currently being used for the shortener attempt.
+
+        A new current_token is created ONLY when the previous attempt
+        was detected as a bypass.
+        """
+        try:
+            now = datetime.now()
+
+            await self.bypass_data.update_one(
+                {
+                    "original_token": original_token,
+                    "current_token": current_token
+                },
+                {
+                    "$set": {
+                        "original_token": original_token,
+                        "current_token": current_token,
+                        "user_id": user_id,
+                        "created_at": now,
+                        "bypass": False,
+                        "invalid": False
+                    }
+                },
+                upsert=True
+            )
+
+            return True
+
+        except Exception as e:
+            print(f"Error creating bypass session: {e}")
+            return False
+
+    async def get_bypass_session(self, current_token: str):
+        """
+        Get the active bypass session using the current token.
+        """
+        try:
+            return await self.bypass_data.find_one(
+                {
+                    "current_token": current_token
+                }
+            )
+
+        except Exception as e:
+            print(f"Error getting bypass session: {e}")
+            return None
+
+    async def invalidate_bypass_token(
+        self,
+        current_token: str
+    ):
+        """
+        Permanently invalidate a token after bypass detection.
+        """
+        try:
+            result = await self.bypass_data.update_one(
+                {
+                    "current_token": current_token
+                },
+                {
+                    "$set": {
+                        "bypass": True,
+                        "invalid": True,
+                        "bypassed_at": datetime.now()
+                    }
+                }
+            )
+
+            return result.modified_count > 0
+
+        except Exception as e:
+            print(f"Error invalidating bypass token: {e}")
+            return False
+
+    async def is_bypass_token_invalid(
+        self,
+        current_token: str
+    ) -> bool:
+        """
+        Check whether the current token was already detected as bypassed.
+        """
+        try:
+            session = await self.bypass_data.find_one(
+                {
+                    "current_token": current_token
+                },
+                {
+                    "invalid": 1
+                }
+            )
+
+            if not session:
+                return False
+
+            return bool(session.get("invalid", False))
+
+        except Exception as e:
+            print(f"Error checking bypass token: {e}")
+            return False
+
+    async def get_bypass_session_by_original(
+        self,
+        original_token: str
+    ):
+        """
+        Get the latest session belonging to an original token.
+        """
+        try:
+            return await self.bypass_data.find_one(
+                {
+                    "original_token": original_token
+                },
+                sort=[("created_at", -1)]
+            )
+
+        except Exception as e:
+            print(f"Error getting original bypass session: {e}")
+            return None
+
+    async def get_active_bypass_session(
+        self,
+        original_token: str,
+        user_id: int
+    ):
+        """
+        Get the latest non-invalid session for an original token/user.
+        """
+        try:
+            return await self.bypass_data.find_one(
+                {
+                    "original_token": original_token,
+                    "user_id": user_id,
+                    "invalid": False
+                },
+                sort=[("created_at", -1)]
+            )
+
+        except Exception as e:
+            print(f"Error getting active bypass session: {e}")
+            return None
+
+    async def get_bypass_statistics(self):
+        """
+        Get total bypass count and bypass user details.
+
+        Every bypassed token is counted separately.
+        This allows /bypass to show:
+        - Total bypasses
+        - User ID
+        - Original token
+        - Bypassed token
+        - Bypass time
+        """
+        try:
+            total_bypasses = await self.bypass_data.count_documents(
+                {
+                    "bypass": True
+                }
+            )
+
+            cursor = self.bypass_data.find(
+                {
+                    "bypass": True
+                }
+            ).sort(
+                "bypassed_at",
+                -1
+            )
+
+            bypasses = []
+
+            async for doc in cursor:
+                bypasses.append({
+                    "user_id": doc.get("user_id"),
+                    "original_token": doc.get("original_token"),
+                    "current_token": doc.get("current_token"),
+                    "created_at": doc.get("created_at"),
+                    "bypassed_at": doc.get("bypassed_at")
+                })
+
+            return {
+                "total": total_bypasses,
+                "bypasses": bypasses
+            }
+
+        except Exception as e:
+            print(f"Error getting bypass statistics: {e}")
+
+            return {
+                "total": 0,
+                "bypasses": []
+            }
+
+    async def get_user_bypass_count(
+        self,
+        user_id: int
+    ) -> int:
+        """
+        Get total number of bypasses performed by one user.
+        """
+        try:
+            return await self.bypass_data.count_documents(
+                {
+                    "user_id": user_id,
+                    "bypass": True
+                }
+            )
+
+        except Exception as e:
+            print(f"Error getting user bypass count: {e}")
+            return 0
+
+    async def get_recent_bypasses(
+        self,
+        limit: int = 50
+    ):
+        """
+        Get recent bypass records.
+        """
+        try:
+            cursor = self.bypass_data.find(
+                {
+                    "bypass": True
+                }
+            ).sort(
+                "bypassed_at",
+                -1
+            ).limit(limit)
+
+            bypasses = []
+
+            async for doc in cursor:
+                bypasses.append({
+                    "user_id": doc.get("user_id"),
+                    "original_token": doc.get("original_token"),
+                    "current_token": doc.get("current_token"),
+                    "created_at": doc.get("created_at"),
+                    "bypassed_at": doc.get("bypassed_at")
+                })
+
+            return bypasses
+
+        except Exception as e:
+            print(f"Error getting recent bypasses: {e}")
+            return []
+
+    async def clear_bypass_data(self):
+        """
+        Delete all bypass records.
+
+        This is intentionally provided as a database function only.
+        It will NOT be called automatically.
+        """
+        try:
+            result = await self.bypass_data.delete_many({})
+
+            return result.deleted_count
+
+        except Exception as e:
+            print(f"Error clearing bypass data: {e}")
+            return 0
+
+
+
+
     async def load_all_settings(self) -> dict:
+        """Load all settings in a single call for efficiency"""
         try:
             bot_settings = await self.get_bot_settings()
             messages = await self.get_messages_settings()
@@ -655,70 +1025,3 @@ class MongoDB:
                 "admins": [],
                 "shortner_settings": {}
             }
-
-    ##############################################################
-    # ✅ BYPASS TRACKING FUNCTIONS
-    ##############################################################
-
-    async def add_bypass_log(self, user_id: int):
-        """Add bypass log for user"""
-        try:
-            await self.user_data.update_one(
-                {"_id": f"bypass_{user_id}"},
-                {"$inc": {"bypass_count": 1}, "$set": {"last_bypass": datetime.now()}},
-                upsert=True
-            )
-            return True
-        except Exception as e:
-            print(f"Error adding bypass log: {e}")
-            return False
-
-    async def get_user_bypass_count(self, user_id: int) -> int:
-        """Get bypass count for specific user"""
-        try:
-            doc = await self.user_data.find_one({"_id": f"bypass_{user_id}"})
-            return doc.get("bypass_count", 0) if doc else 0
-        except Exception as e:
-            print(f"Error getting user bypass count: {e}")
-            return 0
-
-    async def get_total_bypass_stats(self) -> dict:
-        """Get total bypass statistics"""
-        try:
-            total_bypass = 0
-            total_users = 0
-            bypass_list = []
-
-            cursor = self.user_data.find({"_id": {"$regex": "^bypass_"}}).sort("bypass_count", -1)
-            async for doc in cursor:
-                user_id_str = doc["_id"].replace("bypass_", "")
-                try:
-                    user_id = int(user_id_str)
-                except:
-                    continue
-
-                count = doc.get("bypass_count", 0)
-                last_bypass = doc.get("last_bypass", None)
-
-                total_bypass += count
-                total_users += 1
-                bypass_list.append({
-                    'user_id': user_id,
-                    'bypass_count': count,
-                    'last_bypass': last_bypass
-                })
-
-            return {
-                'total_bypass': total_bypass,
-                'total_users': total_users,
-                'bypass_list': bypass_list
-            }
-        except Exception as e:
-            print(f"Error getting total bypass stats: {e}")
-            return {
-                'total_bypass': 0,
-                'total_users': 0,
-                'bypass_list': []
-            }
-
-    ##############################################################
