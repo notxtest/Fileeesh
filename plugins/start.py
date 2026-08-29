@@ -8,28 +8,36 @@ from plugins.shortner import get_short
 from helper.helper_func import get_messages, force_sub, decode, batch_auto_del_notification
 import asyncio
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
+
+
+# ===============================================================#
+# BYPASS / TOKEN CONFIG
+# ===============================================================#
+
+BYPASS_WINDOW = 60
 
 
 # ===============================================================#
 # BYPASS / TOKEN HELPERS
 # ===============================================================#
 
-BYPASS_WINDOW = 60
-
-
 def generate_new_token():
     """
     Generate a completely new random token.
 
-    This token is used only for the shortener session.
+    A new token is generated:
+    1. When an original link is opened for the first time.
+    2. When a bypass is detected.
+
+    Existing active sessions reuse their current token.
     """
     return secrets.token_urlsafe(18)
 
 
 def get_open_link_url(client, token):
     """
-    Generate Telegram start URL for a token.
+    Generate Telegram /start URL for a token.
     """
     return f"https://t.me/{client.username}?start={token}"
 
@@ -37,11 +45,15 @@ def get_open_link_url(client, token):
 def get_short_token(base64_string):
     """
     Existing short-token format:
-        yu3elk{token}7
 
-    Returns token without prefix/suffix.
+        yu3elk{CURRENT_TOKEN}7
+
+    Returns only CURRENT_TOKEN.
     """
-    if base64_string.startswith("yu3elk") and base64_string.endswith("7"):
+    if (
+        base64_string.startswith("yu3elk")
+        and base64_string.endswith("7")
+    ):
         return base64_string[6:-1]
 
     return None
@@ -54,9 +66,9 @@ async def send_open_link_message(
     current_token
 ):
     """
-    Send the Open Link / Tutorial / Premium message.
+    Send the shortener message.
 
-    The shortener always receives the CURRENT token.
+    The shortener receives the CURRENT token.
     """
 
     open_link = get_open_link_url(
@@ -65,7 +77,10 @@ async def send_open_link_message(
     )
 
     try:
-        short_link = get_short(open_link, client)
+        short_link = get_short(
+            open_link,
+            client
+        )
 
     except Exception as e:
         client.LOGGER(
@@ -128,21 +143,28 @@ async def send_open_link_message(
 # /START
 # ===============================================================#
 
-@Client.on_message(filters.command('start') & filters.private)
+@Client.on_message(filters.command("start") & filters.private)
 @force_sub
-async def start_command(client: Client, message: Message):
+async def start_command(
+    client: Client,
+    message: Message
+):
 
     user_id = message.from_user.id
 
     # ===========================================================#
-    # 1. ADD USER
+    # 1. ADD USER IF NOT PRESENT
     # ===========================================================#
 
-    present = await client.mongodb.present_user(user_id)
+    present = await client.mongodb.present_user(
+        user_id
+    )
 
     if not present:
         try:
-            await client.mongodb.add_user(user_id)
+            await client.mongodb.add_user(
+                user_id
+            )
 
         except Exception as e:
             client.LOGGER(
@@ -153,7 +175,7 @@ async def start_command(client: Client, message: Message):
             )
 
     # ===========================================================#
-    # 2. BAN CHECK
+    # 2. CHECK BAN
     # ===========================================================#
 
     is_banned = await client.mongodb.is_banned(
@@ -182,9 +204,10 @@ async def start_command(client: Client, message: Message):
             base64_string = original_payload
 
             is_short_link = False
+            current_token = None
 
             # ---------------------------------------------------#
-            # Existing short-token format
+            # SHORT TOKEN FORMAT
             #
             # yu3elk{CURRENT_TOKEN}7
             # ---------------------------------------------------#
@@ -193,6 +216,7 @@ async def start_command(client: Client, message: Message):
                 base64_string.startswith("yu3elk")
                 and base64_string.endswith("7")
             ):
+
                 current_token = get_short_token(
                     base64_string
                 )
@@ -204,16 +228,13 @@ async def start_command(client: Client, message: Message):
 
                 is_short_link = True
 
-            else:
-                current_token = None
-
         except IndexError:
             return await message.reply(
                 "Invalid command format."
             )
 
         # =======================================================#
-        # 3. PREMIUM CHECK
+        # 3. CHECK PREMIUM
         # =======================================================#
 
         is_user_pro = await client.mongodb.is_pro(
@@ -221,7 +242,7 @@ async def start_command(client: Client, message: Message):
         )
 
         # =======================================================#
-        # 4. SHORTENER STATUS
+        # 4. CHECK SHORTENER STATUS
         # =======================================================#
 
         shortner_enabled = getattr(
@@ -232,18 +253,12 @@ async def start_command(client: Client, message: Message):
 
         # =======================================================#
         # 5. ORIGINAL TOKEN
-        #
-        # Example:
-        #
-        # Z2V0LTU3MjQ5MDE0MDgwNzMx
-        #
-        # This is the permanent/original file token.
         # =======================================================#
 
         original_token = base64_string
 
         # =======================================================#
-        # 6. FREE USER + SHORTENER
+        # FREE USER + SHORTENER ENABLED
         # =======================================================#
 
         if (
@@ -252,16 +267,20 @@ async def start_command(client: Client, message: Message):
             and shortner_enabled
         ):
 
-            # ---------------------------------------------------#
+            # ===================================================#
             # ORIGINAL LINK
-            #
-            # First time this token is opened:
-            # create a new current token.
-            # ---------------------------------------------------#
+            # ===================================================#
 
             if not is_short_link:
 
-                # Check if an active session already exists.
+                # ------------------------------------------------#
+                # Check for an existing active session.
+                #
+                # If one exists, reuse its CURRENT token.
+                #
+                # A new token is NOT created every time.
+                # ------------------------------------------------#
+
                 active_session = (
                     await client.mongodb
                     .get_active_bypass_session(
@@ -270,22 +289,19 @@ async def start_command(client: Client, message: Message):
                     )
                 )
 
-                # ------------------------------------------------#
-                # IMPORTANT:
-                #
-                # If there is already an active token,
-                # DON'T create a new one.
-                #
-                # New token is created ONLY after bypass.
-                # ------------------------------------------------#
-
                 if active_session:
 
-                    current_token = active_session.get(
-                        "current_token"
+                    current_token = (
+                        active_session.get(
+                            "current_token"
+                        )
                     )
 
                 else:
+
+                    # --------------------------------------------#
+                    # First attempt → create new token
+                    # --------------------------------------------#
 
                     current_token = generate_new_token()
 
@@ -294,6 +310,10 @@ async def start_command(client: Client, message: Message):
                         current_token=current_token,
                         user_id=user_id
                     )
+
+                # ------------------------------------------------#
+                # Send shortener link
+                # ------------------------------------------------#
 
                 await send_open_link_message(
                     client=client,
@@ -313,29 +333,46 @@ async def start_command(client: Client, message: Message):
             )
 
             # ---------------------------------------------------#
-            # Unknown token
+            # Session not found
             # ---------------------------------------------------#
 
             if not session:
-                return await message.reply(
-                    "⚠️ Invalid or expired link."
-                )
-
-            # ---------------------------------------------------#
-            # TOKEN DOES NOT BELONG TO THIS ORIGINAL LINK
-            # ---------------------------------------------------#
-
-            if session.get("original_token") != original_token:
 
                 return await message.reply(
                     "⚠️ Invalid or expired link."
                 )
 
             # ---------------------------------------------------#
-            # Already invalid
+            # IMPORTANT:
+            #
+            # Get the REAL original token from the database.
+            #
+            # This fixes the previous bug where:
+            #
+            # original_token = yu3elk{token}7
+            #
+            # was incorrectly compared with the database
+            # original_token.
             # ---------------------------------------------------#
 
-            if session.get("invalid", False):
+            original_token = session.get(
+                "original_token"
+            )
+
+            if not original_token:
+
+                return await message.reply(
+                    "⚠️ Invalid or expired link."
+                )
+
+            # ---------------------------------------------------#
+            # Token invalidated?
+            # ---------------------------------------------------#
+
+            if session.get(
+                "invalid",
+                False
+            ):
 
                 return await message.reply(
                     "⚠️ This link is no longer valid."
@@ -343,10 +380,6 @@ async def start_command(client: Client, message: Message):
 
             # ===================================================#
             # BYPASS DETECTION
-            #
-            # If the short-token is opened within 60 seconds
-            # of the Open Link session being created, it is
-            # considered a bypass according to your rule.
             # ===================================================#
 
             created_at = session.get(
@@ -355,94 +388,111 @@ async def start_command(client: Client, message: Message):
 
             if created_at:
 
-                # MongoDB datetime
-                now = datetime.now()
+                try:
 
-                elapsed = (
-                    now - created_at
-                ).total_seconds()
+                    now = datetime.now()
 
-                # ------------------------------------------------#
-                # LESS THAN 60 SEC = BYPASS
-                # ------------------------------------------------#
+                    # MongoDB normally returns a naive datetime
+                    # when stored using datetime.now().
+                    elapsed = (
+                        now - created_at
+                    ).total_seconds()
 
-                if elapsed < BYPASS_WINDOW:
+                    # ------------------------------------------------#
+                    # LESS THAN 60 SECONDS
+                    # = BYPASS DETECTED
+                    # ------------------------------------------------#
 
-                    # --------------------------------------------#
-                    # INVALIDATE OLD TOKEN
-                    # --------------------------------------------#
+                    if elapsed < BYPASS_WINDOW:
 
-                    await client.mongodb.invalidate_bypass_token(
-                        current_token
+                        # --------------------------------------------#
+                        # INVALIDATE OLD TOKEN
+                        # --------------------------------------------#
+
+                        await client.mongodb.invalidate_bypass_token(
+                            current_token
+                        )
+
+                        # --------------------------------------------#
+                        # CREATE COMPLETELY NEW TOKEN
+                        # --------------------------------------------#
+
+                        new_token = generate_new_token()
+
+                        await client.mongodb.create_bypass_session(
+                            original_token=original_token,
+                            current_token=new_token,
+                            user_id=user_id
+                        )
+
+                        # --------------------------------------------#
+                        # TRY AGAIN
+                        #
+                        # Goes to ORIGINAL /start token.
+                        #
+                        # The original link will automatically
+                        # use the newly created active token.
+                        # --------------------------------------------#
+
+                        try_again_url = get_open_link_url(
+                            client,
+                            original_token
+                        )
+
+                        # --------------------------------------------#
+                        # BYPASS MESSAGE
+                        # --------------------------------------------#
+
+                        bypass_message = (
+                            "> ⚠️ **Bypass Detected!**\n\n"
+                            "> Please don't try to bypass the shortener. "
+                            "Repeated bypass attempts may result in a permanent ban.\n\n"
+                            "> If you believe this happened by mistake, "
+                            "please contact **@Cinevines_bot** for help."
+                        )
+
+                        await message.reply(
+                            bypass_message,
+                            reply_markup=InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton(
+                                        "🔄 TRY AGAIN",
+                                        url=try_again_url
+                                    )
+                                ]
+                            ])
+                        )
+
+                        return
+
+                except Exception as e:
+
+                    client.LOGGER(
+                        __name__,
+                        client.name
+                    ).warning(
+                        f"Bypass time check failed: {e}"
                     )
-
-                    # --------------------------------------------#
-                    # CREATE NEW TOKEN
-                    #
-                    # THIS IS THE ONLY PLACE WHERE A NEW TOKEN
-                    # IS CREATED AFTER THE INITIAL SESSION.
-                    # --------------------------------------------#
-
-                    new_token = generate_new_token()
-
-                    await client.mongodb.create_bypass_session(
-                        original_token=original_token,
-                        current_token=new_token,
-                        user_id=user_id
-                    )
-
-                    # --------------------------------------------#
-                    # TRY AGAIN URL
-                    #
-                    # It intentionally points to the ORIGINAL
-                    # token, not the invalid current token.
-                    # --------------------------------------------#
-
-                    try_again_url = get_open_link_url(
-                        client,
-                        original_token
-                    )
-
-                    await message.reply(
-                        "⚠️ **Bypass Detected!**\n\n"
-                        "The previous link has been invalidated.\n"
-                        "Please try again with a new link.",
-                        reply_markup=InlineKeyboardMarkup([
-                            [
-                                InlineKeyboardButton(
-                                    "🔄 TRY AGAIN",
-                                    url=try_again_url
-                                )
-                            ]
-                        ])
-                    )
-
-                    return
 
             # ===================================================#
             # NORMAL SUCCESS
             #
-            # If user reaches here after the allowed window,
-            # token remains valid and files are delivered.
+            # If 60+ seconds have passed, continue normally.
             # ===================================================#
 
-            # Continue below to decode and send files.
-
         # =======================================================#
-        # 7. DECODE AND PREPARE FILE IDS
+        # 6. DECODE AND PREPARE FILE IDS
         # =======================================================#
 
         try:
 
-            # For short token:
+            # ---------------------------------------------------#
+            # For short-link:
             #
-            # yu3elk{current_token}7
-            #
-            # convert back to original token.
-            #
-            # IMPORTANT:
-            # The session stores the original token.
-            #
+            # current token → database session
+            # database session → original token
+            # original token → decode
+            # ---------------------------------------------------#
 
             if is_short_link:
 
@@ -451,11 +501,16 @@ async def start_command(client: Client, message: Message):
                 )
 
                 if not session:
+
                     return await message.reply(
                         "⚠️ Invalid or expired link."
                     )
 
-                if session.get("invalid", False):
+                if session.get(
+                    "invalid",
+                    False
+                ):
+
                     return await message.reply(
                         "⚠️ This link is no longer valid."
                     )
@@ -465,18 +520,24 @@ async def start_command(client: Client, message: Message):
                 )
 
                 if not base64_string:
+
                     return await message.reply(
                         "⚠️ Invalid or expired link."
                     )
+
+            # ===================================================#
+            # DECODE
+            # ===================================================#
 
             string = await decode(
                 base64_string
             )
 
-            argument = string.split("-")
+            argument = string.split(
+                "-"
+            )
 
             ids = []
-
             source_channel_id = None
 
             # ===================================================#
@@ -528,8 +589,9 @@ async def start_command(client: Client, message: Message):
                         __name__,
                         client.name
                     ).info(
-                        f"Decoded batch from primary channel "
-                        f"{source_channel_id}: {start}-{end}"
+                        f"Decoded batch from primary "
+                        f"channel {source_channel_id}: "
+                        f"{start}-{end}"
                     )
 
                 else:
@@ -572,7 +634,9 @@ async def start_command(client: Client, message: Message):
                             channel_multiplier == 0
                         ):
 
-                            source_channel_id = channel_id
+                            source_channel_id = (
+                                channel_id
+                            )
 
                             start = start_test
                             end = end_test
@@ -589,7 +653,7 @@ async def start_command(client: Client, message: Message):
                             break
 
                     # --------------------------------------------#
-                    # FALLBACK
+                    # FALLBACK TO PRIMARY
                     # --------------------------------------------#
 
                     if source_channel_id is None:
@@ -600,7 +664,10 @@ async def start_command(client: Client, message: Message):
                         end = end_primary
 
                 ids = (
-                    range(start, end + 1)
+                    range(
+                        start,
+                        end + 1
+                    )
                     if start <= end
                     else list(
                         range(
@@ -688,7 +755,9 @@ async def start_command(client: Client, message: Message):
                                 channel_multiplier == 0
                             ):
 
-                                source_channel_id = channel_id
+                                source_channel_id = (
+                                    channel_id
+                                )
 
                                 ids = [
                                     msg_id_test
@@ -744,7 +813,7 @@ async def start_command(client: Client, message: Message):
             )
 
         # =======================================================#
-        # 8. GET FILES
+        # 7. GET MESSAGES
         # =======================================================#
 
         temp_msg = await message.reply(
@@ -754,6 +823,10 @@ async def start_command(client: Client, message: Message):
         messages = []
 
         try:
+
+            # ---------------------------------------------------#
+            # SOURCE CHANNEL
+            # ---------------------------------------------------#
 
             if source_channel_id:
 
@@ -767,9 +840,13 @@ async def start_command(client: Client, message: Message):
 
                 try:
 
+                    ids_list = list(
+                        ids
+                    )
+
                     msgs = await client.get_messages(
                         chat_id=source_channel_id,
-                        message_ids=list(ids)
+                        message_ids=ids_list
                     )
 
                     valid_msgs = [
@@ -787,22 +864,25 @@ async def start_command(client: Client, message: Message):
                         client.name
                     ).info(
                         f"Found {len(valid_msgs)} messages "
-                        f"from source channel {source_channel_id}"
+                        f"from source channel "
+                        f"{source_channel_id}"
                     )
 
-                    if (
-                        len(valid_msgs)
-                        <
-                        len(list(ids))
-                    ):
+                    # ------------------------------------------------#
+                    # FALLBACK FOR MISSING MESSAGES
+                    # ------------------------------------------------#
+
+                    if len(valid_msgs) < len(ids_list):
+
+                        valid_ids = {
+                            msg.id
+                            for msg in valid_msgs
+                        }
 
                         missing_ids = [
                             mid
-                            for mid in ids
-                            if mid not in {
-                                msg.id
-                                for msg in valid_msgs
-                            }
+                            for mid in ids_list
+                            if mid not in valid_ids
                         ]
 
                         if missing_ids:
@@ -811,8 +891,8 @@ async def start_command(client: Client, message: Message):
                                 __name__,
                                 client.name
                             ).info(
-                                f"Missing {len(missing_ids)} messages, "
-                                f"trying fallback system"
+                                f"Missing {len(missing_ids)} "
+                                f"messages, trying fallback system"
                             )
 
                             additional_messages = (
@@ -824,6 +904,15 @@ async def start_command(client: Client, message: Message):
 
                             messages.extend(
                                 additional_messages
+                            )
+
+                            client.LOGGER(
+                                __name__,
+                                client.name
+                            ).info(
+                                f"Found "
+                                f"{len(additional_messages)} "
+                                f"additional messages from fallback"
                             )
 
                 except Exception as e:
@@ -842,6 +931,10 @@ async def start_command(client: Client, message: Message):
                     )
 
             else:
+
+                # ------------------------------------------------#
+                # MULTI-CHANNEL FALLBACK
+                # ------------------------------------------------#
 
                 messages = await get_messages(
                     client,
@@ -864,7 +957,7 @@ async def start_command(client: Client, message: Message):
             return
 
         # =======================================================#
-        # NO FILES
+        # NO FILES FOUND
         # =======================================================#
 
         if not messages:
@@ -885,8 +978,8 @@ async def start_command(client: Client, message: Message):
 
             caption = (
                 client.messages.get(
-                    'CAPTION',
-                    ''
+                    "CAPTION",
+                    ""
                 ).format(
                     previouscaption=(
                         msg.caption.html
@@ -896,12 +989,13 @@ async def start_command(client: Client, message: Message):
                 )
                 if bool(
                     client.messages.get(
-                        'CAPTION',
-                        ''
+                        "CAPTION",
+                        ""
                     )
                 )
-                and
-                bool(msg.document)
+                and bool(
+                    msg.document
+                )
                 else (
                     ""
                     if not msg.caption
@@ -955,7 +1049,7 @@ async def start_command(client: Client, message: Message):
                 )
 
         # =======================================================#
-        # 9. AUTO DELETE
+        # 8. AUTO DELETE
         # =======================================================#
 
         if (
@@ -964,6 +1058,7 @@ async def start_command(client: Client, message: Message):
             client.auto_del > 0
         ):
 
+            # Keep original /start payload.
             transfer_link = original_payload
 
             asyncio.create_task(
@@ -980,7 +1075,7 @@ async def start_command(client: Client, message: Message):
         return
 
     # ===========================================================#
-    # NORMAL START
+    # NORMAL /START
     # ===========================================================#
 
     else:
@@ -1016,15 +1111,15 @@ async def start_command(client: Client, message: Message):
         )
 
         start_caption = client.messages.get(
-            'START',
-            'Welcome, {mention}'
+            "START",
+            "Welcome, {mention}"
         ).format(
             first=message.from_user.first_name,
             last=message.from_user.last_name,
             username=(
                 None
                 if not message.from_user.username
-                else '@' + message.from_user.username
+                else "@" + message.from_user.username
             ),
             mention=message.from_user.mention,
             id=message.from_user.id
@@ -1060,20 +1155,26 @@ async def start_command(client: Client, message: Message):
 # /BYPASS
 # ===============================================================#
 
-@Client.on_message(filters.command("bypass") & filters.private)
-async def bypass_command(client: Client, message: Message):
+@Client.on_message(
+    filters.command("bypass") & filters.private
+)
+async def bypass_command(
+    client: Client,
+    message: Message
+):
 
     user_id = message.from_user.id
 
-    # -----------------------------------------------------------#
+    # ===========================================================#
     # ADMIN ONLY
-    # -----------------------------------------------------------#
+    # ===========================================================#
 
     if (
         user_id != OWNER_ID
         and
         user_id not in client.admins
     ):
+
         return await message.reply(
             "❌ You are not authorized to use this command."
         )
@@ -1092,9 +1193,9 @@ async def bypass_command(client: Client, message: Message):
             []
         )
 
-        # -------------------------------------------------------#
+        # =======================================================#
         # NO BYPASS
-        # -------------------------------------------------------#
+        # =======================================================#
 
         if total == 0:
 
@@ -1104,18 +1205,18 @@ async def bypass_command(client: Client, message: Message):
                 "No bypass detected yet."
             )
 
-        # -------------------------------------------------------#
+        # =======================================================#
         # HEADER
-        # -------------------------------------------------------#
+        # =======================================================#
 
         text = (
             "🛡️ **BYPASS STATISTICS**\n\n"
             f"🔢 **Total Bypasses:** `{total}`\n\n"
         )
 
-        # -------------------------------------------------------#
+        # =======================================================#
         # DETAILS
-        # -------------------------------------------------------#
+        # =======================================================#
 
         for index, data in enumerate(
             bypasses[:50],
@@ -1159,11 +1260,14 @@ async def bypass_command(client: Client, message: Message):
                 f"🕐 Time: `{bypass_time}`\n\n"
             )
 
+            # ---------------------------------------------------#
             # Telegram message length safety
+            # ---------------------------------------------------#
+
             if len(text) > 3500:
 
                 text += (
-                    f"Showing latest 50 bypass records."
+                    "Showing latest 50 bypass records."
                 )
 
                 break
@@ -1190,7 +1294,9 @@ async def bypass_command(client: Client, message: Message):
 # /REQUEST
 # ===============================================================#
 
-@Client.on_message(filters.command('request') & filters.private)
+@Client.on_message(
+    filters.command("request") & filters.private
+)
 async def request_command(
     client: Client,
     message: Message
@@ -1208,6 +1314,10 @@ async def request_command(
         )
     )
 
+    # ===========================================================#
+    # ADMIN / OWNER
+    # ===========================================================#
+
     if (
         is_admin
         or
@@ -1220,6 +1330,10 @@ async def request_command(
         )
 
         return
+
+    # ===========================================================#
+    # PREMIUM CHECK
+    # ===========================================================#
 
     if not is_user_premium:
 
@@ -1242,6 +1356,10 @@ async def request_command(
 
         return
 
+    # ===========================================================#
+    # REQUEST TEXT
+    # ===========================================================#
+
     if len(message.command) < 2:
 
         await message.reply(
@@ -1254,6 +1372,10 @@ async def request_command(
     requested = " ".join(
         message.command[1:]
     )
+
+    # ===========================================================#
+    # SEND REQUEST TO OWNER
+    # ===========================================================#
 
     owner_message = (
         f"📩 **New Request from "
@@ -1277,7 +1399,9 @@ async def request_command(
 # /PROFILE
 # ===============================================================#
 
-@Client.on_message(filters.command('profile') & filters.private)
+@Client.on_message(
+    filters.command("profile") & filters.private
+)
 async def my_plan(
     client: Client,
     message: Message
@@ -1288,6 +1412,10 @@ async def my_plan(
     is_admin = (
         user_id in client.admins
     )
+
+    # ===========================================================#
+    # ADMIN / OWNER
+    # ===========================================================#
 
     if (
         is_admin
@@ -1302,11 +1430,19 @@ async def my_plan(
 
         return
 
+    # ===========================================================#
+    # PREMIUM CHECK
+    # ===========================================================#
+
     is_user_premium = (
         await client.mongodb.is_pro(
             user_id
         )
     )
+
+    # ===========================================================#
+    # PREMIUM USER
+    # ===========================================================#
 
     if is_user_premium:
 
@@ -1317,6 +1453,10 @@ async def my_plan(
             "🔸 Request: Enabled\n\n"
             "🌟 You're a Premium User!"
         )
+
+    # ===========================================================#
+    # FREE USER
+    # ===========================================================#
 
     else:
 
