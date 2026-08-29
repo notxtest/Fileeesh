@@ -142,7 +142,7 @@ class Bot(Client):
         try:
             db_channel = await self.get_chat(self.db)
             self.db_channel = db_channel
-            test = await self.send_message(chat_id = db_channel.id, text = "Testing Message by @ProYato")
+            test = await self.send_message(chat_id = db_channel.id, text = "Testing Message by @Cinevines")
             await test.delete()
             
             # Log DB channels info
@@ -151,7 +151,7 @@ class Bot(Client):
         except Exception as e:
             self.LOGGER(__name__, self.name).warning(e)
             self.LOGGER(__name__, self.name).warning(f"Make Sure bot is Admin in DB Channel, and Double check the database channel Value, Current Value {self.db}")
-            self.LOGGER(__name__, self.name).info("\nBot Stopped. Join https://t.me/animes_cruise for support")
+            self.LOGGER(__name__, self.name).info("\nBot Stopped. Join https://t.me/Cinevines_Bot for support")
             sys.exit()
         self.LOGGER(__name__, self.name).info("Bot Started!!")
         
