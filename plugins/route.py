@@ -4,6 +4,10 @@ import os
 
 routes = web.RouteTableDef()
 
+@routes.get("/health")
+async def health_route_handler(request):
+    return web.Response(text="OK", status=200)
+
 @routes.get("/", allow_head=True)
 async def root_route_handler(request):
     readme_path = os.path.join(os.path.dirname(__file__), "README.md")
